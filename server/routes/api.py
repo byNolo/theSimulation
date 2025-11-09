@@ -1,0 +1,147 @@
+from flask import Blueprint, jsonify, request, session
+from zoneinfo import ZoneInfo
+from datetime import datetime
+from ..db import db
+from ..models import Day, WorldState, Event, Vote, Telemetry, User
+from ..events import choose_template
+from sqlalchemy.exc import IntegrityError
+
+api_bp = Blueprint('api', __name__)
+
+
+def est_today():
+    return datetime.now(ZoneInfo('America/New_York')).date()
+
+
+def ensure_today():
+    today = est_today()
+    day = Day.query.filter_by(est_date=today).first()
+    if day:
+        return day
+    
+    # Get last state and count total days
+    last_state = WorldState.query.order_by(WorldState.id.desc()).first()
+    day_count = Day.query.count()
+    
+    if last_state:
+        morale = last_state.morale
+        supplies = last_state.supplies
+        threat = last_state.threat
+        last_event = last_state.last_event
+    else:
+        morale, supplies, threat, last_event = 70, 80, 30, 'Genesis'
+    
+    template = choose_template(morale, supplies, threat, day_count + 1)
+    day = Day(est_date=today)
+    db.session.add(day)
+    db.session.flush()
+    
+    # Store option labels for display
+    option_data = [{"key": o.key, "label": o.label, "description": o.description} for o in template.options]
+    
+    ws = WorldState(day_id=day.id, morale=morale, supplies=supplies, threat=threat, last_event=last_event)
+    ev = Event(day_id=day.id, headline=template.headline, description=template.description, options=option_data)
+    db.session.add_all([ws, ev])
+    db.session.commit()
+    return day
+
+
+def get_current():
+    today = est_today()
+    day = Day.query.filter_by(est_date=today).first()
+    if not day:
+        day = ensure_today()
+    ws = WorldState.query.filter_by(day_id=day.id).first()
+    ev = Event.query.filter_by(day_id=day.id).first()
+    return day, ws, ev
+
+
+def tally_for_day(day_id: int):
+    votes = Vote.query.filter_by(day_id=day_id).all()
+    t = {}
+    for v in votes:
+        t[v.option] = t.get(v.option, 0) + 1
+    return t
+
+
+@api_bp.route('/state')
+def api_state():
+    day, ws, _ = get_current()
+    return jsonify({
+        'day': day.id,
+        'morale': ws.morale,
+        'supplies': ws.supplies,
+        'threat': ws.threat,
+        'last_event': ws.last_event,
+        'est_date': day.est_date.isoformat(),
+    })
+
+
+@api_bp.route('/me')
+def api_me():
+    token = session.get('access_token')
+    if not token:
+        return jsonify({'authenticated': False})
+    # upsert user
+    from ..utils.auth import upsert_user_from_token
+    user = upsert_user_from_token(token)
+    if not user:
+        return jsonify({'authenticated': False})
+    return jsonify({'authenticated': True, 'user': {'id': user.id, 'display_name': user.display_name, 'is_admin': bool(user.is_admin)}})
+
+
+@api_bp.route('/event')
+def api_event():
+    day, _, ev = get_current()
+    return jsonify({
+        'day': day.id,
+        'headline': ev.headline,
+        'description': ev.description,
+        'options': ev.options,  # Now includes label and description
+    })
+
+
+@api_bp.route('/tally')
+def api_tally():
+    """Get current day vote tally (public endpoint)"""
+    day, _, _ = get_current()
+    tally = tally_for_day(day.id)
+    return jsonify(tally)
+
+
+@api_bp.route('/vote', methods=['POST'])
+def api_vote():
+    # Require authentication to vote
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Authentication required to vote'}), 401
+    
+    day, _, ev = get_current()
+    data = request.get_json(force=True)
+    choice = data.get('choice')
+    
+    # Validate choice exists in current event options
+    valid_options = [opt['key'] if isinstance(opt, dict) else opt for opt in ev.options]
+    if choice not in valid_options:
+        return jsonify({'error': 'Invalid choice'}), 400
+    
+    # Check if user already voted
+    existing = Vote.query.filter_by(day_id=day.id, user_id=user_id).first()
+    if existing:
+        return jsonify({'error': 'Already voted today'}), 409
+    
+    vote = Vote(day_id=day.id, option=choice, user_id=user_id, anon_id=None)
+    db.session.add(vote)
+    db.session.add(Telemetry(event_type='vote', payload={'choice': choice}, user_id=user_id))
+    
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'error': 'Already voted today'}), 409
+    
+    tally = tally_for_day(day.id)
+    return jsonify({'ok': True, 'choice': choice, 'tally': tally})
+
+
+

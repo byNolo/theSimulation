@@ -1,0 +1,16 @@
+import { useEffect, useState } from 'react'
+
+export default function useFetch<T>(url: string, deps: any[] = []) {
+  const [data, setData] = useState<T | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch(url, { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => { if (!cancelled) setData(d) })
+      .catch(e => { if (!cancelled) setError(String(e)) })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
+  return { data, error }
+}
