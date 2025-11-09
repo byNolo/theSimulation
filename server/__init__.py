@@ -18,7 +18,14 @@ def create_app():
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret')
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL') or f"sqlite:///{os.path.join(os.path.dirname(__file__), 'simulation.db')}"
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    CORS(app, supports_credentials=True)
+    
+    # CORS - allow production domain and localhost
+    allowed_origins = [
+        'https://thesim.bynolo.ca',
+        'https://localhost:5160',
+        'http://localhost:5160',
+    ]
+    CORS(app, supports_credentials=True, origins=allowed_origins)
 
     db.init_app(app)
 

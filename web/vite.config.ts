@@ -35,5 +35,27 @@ export default defineConfig({
         secure: false
       }
     }
+  },
+  preview: {
+    port: 5160,
+    host: '0.0.0.0',  // Listen on all interfaces for remote cloudflared
+    https: false,  // Cloudflare Tunnel handles HTTPS, use plain HTTP locally
+    allowedHosts: [
+      'thesim.bynolo.ca',
+      'localhost',
+      '192.168.1.13'
+    ],
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5060',
+        changeOrigin: true,
+        secure: false
+      },
+      '/auth': {
+        target: 'http://localhost:5060',
+        changeOrigin: true,
+        secure: false
+      }
+    }
   }
 })

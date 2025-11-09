@@ -187,6 +187,40 @@ Available VS Code tasks:
 
 Use the `Run Both` task to start backend and frontend simultaneously.
 
+### Production run (simple local / small production)
+
+A helper script for running a small production-style deployment locally (recommended for staging or simple deployments).
+
+Usage:
+
+```bash
+# from the repository root
+./run_prod.sh
+# Optional environment overrides:
+PORT=5060 WEB_PORT=5160 WORKERS=4 ./run_prod.sh
+```
+
+What it does:
+- Ensures `server/.venv` exists and installs backend requirements if missing
+- Installs `gunicorn` into the venv if not present and starts the backend
+- Builds the frontend and serves it with `vite preview` (on `WEB_PORT`)
+- Writes logs to `logs/backend.log` and `logs/frontend.log` and PID files at `server/gunicorn.pid` and `web/preview.pid`
+
+Notes:
+- This script is intended for simple/staging use. For production-grade deployments use a process manager (systemd, supervisor, or containers) and a reverse proxy (nginx) with TLS terminated externally.
+
+## 🚀 Production Deployment
+
+For deploying to production with Cloudflare Tunnel at `thesim.bynolo.ca`, see the comprehensive [DEPLOYMENT.md](DEPLOYMENT.md) guide.
+
+Quick production start:
+1. Configure `.env` with production OAuth settings
+2. Run `./run_prod.sh` on the application server
+3. Set up Cloudflare Tunnel from another machine pointing to this server
+4. Access at `https://thesim.bynolo.ca`
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed steps, troubleshooting, and maintenance.
+
 ### Database Reset
 
 ```bash

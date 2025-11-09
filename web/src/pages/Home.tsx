@@ -4,6 +4,7 @@ import { default as api } from '../services/api'
 import StatBar from '../components/StatBar'
 import EventCard from '../components/EventCard'
 import Header from '../components/Header'
+import WelcomeModal from '../components/WelcomeModal'
 
 type WorldState = { day: number; morale: number; supplies: number; threat: number; last_event: string }
 type EventData = { day: number; headline: string; description: string; options: string[] }
@@ -115,6 +116,12 @@ const Home: React.FC = () => {
 
   return (
     <div className="min-h-screen p-6 max-w-6xl mx-auto relative">
+      {/* Welcome Modal for first-time users */}
+      <WelcomeModal 
+        isAuthenticated={me?.authenticated || false}
+        username={me?.user?.username}
+      />
+
       {/* Dynamic animated background effects */}
       <div className="fixed inset-0 -z-20">
         <div className={`absolute top-1/4 left-1/4 w-96 h-96 ${bgEffects.orb1} rounded-full blur-3xl ${bgEffects.pulse}`} />

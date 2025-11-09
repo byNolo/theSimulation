@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Generate Favicon & OG Image</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #1a1a2e; color: #fff; }
+    canvas { border: 1px solid #444; margin: 10px; background: #000; }
+    .output { margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <h1>The Simulation - Icon Generator</h1>
+  <p>Right-click each image and "Save As" to download.</p>
+  
+  <div class="output">
+    <h2>16x16 Favicon</h2>
+    <canvas id="favicon16" width="16" height="16"></canvas>
+  </div>
+  
+  <div class="output">
+    <h2>32x32 Favicon</h2>
+    <canvas id="favicon32" width="32" height="32"></canvas>
+  </div>
+  
+  <div class="output">
+    <h2>180x180 Apple Touch Icon</h2>
+    <canvas id="apple180" width="180" height="180"></canvas>
+  </div>
+  
+  <div class="output">
+    <h2>1200x630 OG Image (Discord/Social)</h2>
+    <canvas id="ogimage" width="1200" height="630"></canvas>
+  </div>
+
+  <script>
+    // Draw favicon at different sizes
+    function drawFavicon(canvas) {
+      const ctx = canvas.getContext('2d');
+      const size = canvas.width;
+      const center = size / 2;
+      const radius = size * 0.35;
+      
+      // Background
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, size, size);
+      
+      // Glow
+      const glow = ctx.createRadialGradient(center, center, 0, center, center, size/2);
+      glow.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
+      glow.addColorStop(1, 'rgba(99, 102, 241, 0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, size, size);
+      
+      // Globe outline
+      const grad = ctx.createLinearGradient(0, 0, size, size);
+      grad.addColorStop(0, '#818cf8');
+      grad.addColorStop(1, '#c084fc');
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = size > 50 ? 3 : 2;
+      ctx.beginPath();
+      ctx.arc(center, center, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Lines
+      ctx.lineWidth = size > 50 ? 1.5 : 1;
+      ctx.globalAlpha = 0.6;
+      
+      // Horizontal ellipse
+      ctx.beginPath();
+      ctx.ellipse(center, center, radius, radius * 0.5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Vertical ellipse
+      ctx.beginPath();
+      ctx.ellipse(center, center, radius * 0.5, radius, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      ctx.globalAlpha = 1;
+      
+      // Stat dots (if size allows)
+      if (size >= 32) {
+        const dotSize = size > 100 ? 6 : 3;
+        // Green (morale)
+        ctx.fillStyle = '#10b981';
+        ctx.beginPath();
+        ctx.arc(center - radius * 0.5, center - radius * 0.5, dotSize, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Amber (supplies)
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.arc(center + radius * 0.5, center - radius * 0.5, dotSize, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Red (threat)
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(center, center + radius * 0.5, dotSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    
+    // Draw OG Image
+    function drawOGImage(canvas) {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      
+      // Background gradient
+      const bgGrad = ctx.createLinearGradient(0, 0, w, h);
+      bgGrad.addColorStop(0, '#0f0f1e');
+      bgGrad.addColorStop(1, '#1a1a2e');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, w, h);
+      
+      // Glow orbs
+      const glow1 = ctx.createRadialGradient(w * 0.2, h * 0.3, 0, w * 0.2, h * 0.3, 400);
+      glow1.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
+      glow1.addColorStop(1, 'rgba(99, 102, 241, 0)');
+      ctx.fillStyle = glow1;
+      ctx.fillRect(0, 0, w, h);
+      
+      const glow2 = ctx.createRadialGradient(w * 0.8, h * 0.7, 0, w * 0.8, h * 0.7, 400);
+      glow2.addColorStop(0, 'rgba(192, 132, 252, 0.3)');
+      glow2.addColorStop(1, 'rgba(192, 132, 252, 0)');
+      ctx.fillStyle = glow2;
+      ctx.fillRect(0, 0, w, h);
+      
+      // Draw large globe icon
+      const centerX = w * 0.25;
+      const centerY = h * 0.5;
+      const radius = 180;
+      
+      const globeGrad = ctx.createLinearGradient(centerX - radius, centerY - radius, centerX + radius, centerY + radius);
+      globeGrad.addColorStop(0, '#818cf8');
+      globeGrad.addColorStop(1, '#c084fc');
+      ctx.strokeStyle = globeGrad;
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Globe lines
+      ctx.lineWidth = 4;
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.ellipse(centerX, centerY, radius, radius * 0.5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(centerX, centerY, radius * 0.5, radius, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      
+      // Stats dots
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(centerX - radius * 0.6, centerY - radius * 0.6, 12, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(centerX + radius * 0.6, centerY - radius * 0.6, 12, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY + radius * 0.7, 12, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 72px sans-serif';
+      ctx.fillText('The Simulation', w * 0.5, h * 0.35);
+      
+      ctx.fillStyle = '#a0a0b0';
+      ctx.font = '36px sans-serif';
+      ctx.fillText('A Multiplayer Social Experiment', w * 0.5, h * 0.48);
+      
+      ctx.font = '28px sans-serif';
+      ctx.fillText('Shape a persistent world through', w * 0.5, h * 0.62);
+      ctx.fillText('collective choices. Vote daily.', w * 0.5, h * 0.7);
+      
+      // Stats preview
+      const statsY = h * 0.83;
+      const statsX = w * 0.5;
+      
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillStyle = '#10b981';
+      ctx.fillText('🟢 Morale', statsX - 200, statsY);
+      
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillText('🟡 Supplies', statsX, statsY);
+      
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText('🔴 Threat', statsX + 200, statsY);
+    }
+    
+    // Generate all images
+    drawFavicon(document.getElementById('favicon16'));
+    drawFavicon(document.getElementById('favicon32'));
+    drawFavicon(document.getElementById('apple180'));
+    drawOGImage(document.getElementById('ogimage'));
+    
+    // Add download links
+    document.querySelectorAll('canvas').forEach(canvas => {
+      const link = document.createElement('a');
+      link.textContent = `Download ${canvas.id}.png`;
+      link.href = canvas.toDataURL();
+      link.download = `${canvas.id}.png`;
+      link.style.display = 'block';
+      link.style.marginTop = '10px';
+      link.style.color = '#818cf8';
+      canvas.parentElement.appendChild(link);
+    });
+  </script>
+</body>
+</html>
