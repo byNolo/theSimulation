@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, session, request
 from ..utils.decorators import require_admin
 from ..routes.api import get_current, tally_for_day
-from ..models import WorldState, Vote, Telemetry, Event, CustomEvent
+from ..models import WorldState, Vote, Telemetry, Event, CustomEvent, User
 from ..db import db
 from ..events import deltas_for_option, ALL_EVENTS
 from datetime import datetime
@@ -102,6 +102,9 @@ def api_tick():
         telemetry_payload['reason'] = game_over_reason
         ws.last_event = game_over_reason
     
+    # Mark objects as modified and add telemetry
+    db.session.add(ws)
+    db.session.add(day)
     db.session.add(Telemetry(event_type='tick', payload=telemetry_payload, user_id=user_id))
     db.session.commit()
     
@@ -412,3 +415,194 @@ def toggle_event(event_db_id):
         'is_active': event.is_active,
         'message': f'Event {"activated" if event.is_active else "deactivated"}'
     })
+
+
+# ====== USER MANAGEMENT ENDPOINTS ======
+
+@admin_bp.route('/users', methods=['GET'])
+@require_admin
+def list_users():
+    """List all users with pagination"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    
+    # Get all users with pagination
+    pagination = User.query.order_by(User.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    users_list = []
+    for user in pagination.items:
+        # Get user's vote count
+        vote_count = Vote.query.filter_by(user_id=user.id).count()
+        
+        users_list.append({
+            'id': user.id,
+            'provider': user.provider,
+            'provider_user_id': user.provider_user_id,
+            'display_name': user.display_name,
+            'email': user.email,
+            'is_admin': user.is_admin,
+            'created_at': user.created_at.isoformat(),
+            'vote_count': vote_count
+        })
+    
+    return jsonify({
+        'users': users_list,
+        'total': pagination.total,
+        'page': page,
+        'per_page': per_page,
+        'pages': pagination.pages
+    })
+
+
+@admin_bp.route('/users/<int:user_id>', methods=['GET'])
+@require_admin
+def get_user(user_id):
+    """Get detailed user information"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    # Get user's voting history
+    votes = Vote.query.filter_by(user_id=user.id).order_by(Vote.created_at.desc()).limit(50).all()
+    vote_history = []
+    for vote in votes:
+        from ..models import Day
+        day = Day.query.get(vote.day_id)
+        vote_history.append({
+            'day_id': vote.day_id,
+            'date': day.est_date.isoformat() if day else None,
+            'option': vote.option,
+            'created_at': vote.created_at.isoformat()
+        })
+    
+    # Get telemetry for this user
+    telemetry = Telemetry.query.filter_by(user_id=user.id).order_by(Telemetry.created_at.desc()).limit(20).all()
+    telemetry_list = [{
+        'event_type': t.event_type,
+        'payload': t.payload,
+        'created_at': t.created_at.isoformat()
+    } for t in telemetry]
+    
+    return jsonify({
+        'id': user.id,
+        'provider': user.provider,
+        'provider_user_id': user.provider_user_id,
+        'display_name': user.display_name,
+        'email': user.email,
+        'is_admin': user.is_admin,
+        'created_at': user.created_at.isoformat(),
+        'vote_count': len(votes),
+        'vote_history': vote_history,
+        'telemetry': telemetry_list
+    })
+
+
+@admin_bp.route('/users/<int:user_id>/admin', methods=['POST'])
+@require_admin
+def toggle_admin(user_id):
+    """Toggle user admin status"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    # Prevent self-demotion
+    current_user_id = session.get('user_id')
+    if user.id == current_user_id:
+        return jsonify({'error': 'Cannot modify your own admin status'}), 400
+    
+    user.is_admin = not user.is_admin
+    db.session.commit()
+    
+    # Log this action
+    admin_user_id = session.get('user_id')
+    db.session.add(Telemetry(
+        event_type='admin_toggle',
+        payload={
+            'target_user_id': user.id,
+            'new_admin_status': user.is_admin,
+            'display_name': user.display_name
+        },
+        user_id=admin_user_id
+    ))
+    db.session.commit()
+    
+    return jsonify({
+        'ok': True,
+        'user_id': user.id,
+        'is_admin': user.is_admin,
+        'message': f'User {"promoted to" if user.is_admin else "demoted from"} admin'
+    })
+
+
+@admin_bp.route('/users/<int:user_id>', methods=['DELETE'])
+@require_admin
+def delete_user(user_id):
+    """Delete a user (soft delete - anonymize their data)"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    # Prevent self-deletion
+    current_user_id = session.get('user_id')
+    if user.id == current_user_id:
+        return jsonify({'error': 'Cannot delete your own account'}), 400
+    
+    # Log this action before deletion
+    admin_user_id = session.get('user_id')
+    db.session.add(Telemetry(
+        event_type='user_delete',
+        payload={
+            'target_user_id': user.id,
+            'display_name': user.display_name,
+            'provider': user.provider
+        },
+        user_id=admin_user_id
+    ))
+    
+    # Delete the user (this will cascade to their votes and telemetry based on foreign key settings)
+    # Or we could anonymize instead
+    db.session.delete(user)
+    db.session.commit()
+    
+    return jsonify({
+        'ok': True,
+        'message': 'User deleted successfully'
+    })
+
+
+@admin_bp.route('/users/stats', methods=['GET'])
+@require_admin
+def user_stats():
+    """Get overall user statistics"""
+    total_users = User.query.count()
+    admin_users = User.query.filter_by(is_admin=True).count()
+    
+    # Provider breakdown
+    from sqlalchemy import func
+    provider_stats = db.session.query(
+        User.provider,
+        func.count(User.id).label('count')
+    ).group_by(User.provider).all()
+    
+    provider_breakdown = {provider: count for provider, count in provider_stats}
+    
+    # Recent signups (last 30 days)
+    from datetime import timedelta
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    recent_signups = User.query.filter(User.created_at >= thirty_days_ago).count()
+    
+    # Active users (users who have voted)
+    active_users = db.session.query(Vote.user_id).distinct().count()
+    
+    return jsonify({
+        'total_users': total_users,
+        'admin_users': admin_users,
+        'regular_users': total_users - admin_users,
+        'provider_breakdown': provider_breakdown,
+        'recent_signups_30d': recent_signups,
+        'active_users': active_users,
+        'inactive_users': total_users - active_users
+    })
+

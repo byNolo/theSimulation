@@ -87,8 +87,42 @@ export async function toggleEvent(dbId: number) {
   })
 }
 
+// User management endpoints
+export async function listUsers(page = 1, perPage = 50) {
+  return fetchJson(`/api/admin/users?page=${page}&per_page=${perPage}`, { 
+    credentials: 'include' 
+  })
+}
+
+export async function getUser(userId: number) {
+  return fetchJson(`/api/admin/users/${userId}`, { 
+    credentials: 'include' 
+  })
+}
+
+export async function toggleUserAdmin(userId: number) {
+  return fetchJson(`/api/admin/users/${userId}/admin`, {
+    method: 'POST',
+    credentials: 'include'
+  })
+}
+
+export async function deleteUser(userId: number) {
+  return fetchJson(`/api/admin/users/${userId}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  })
+}
+
+export async function getUserStats() {
+  return fetchJson('/api/admin/users/stats', { 
+    credentials: 'include' 
+  })
+}
+
 export default { 
   getMe, getState, getEvent, vote, getTally, 
   getMetrics, getHistory, getTelemetry, adminTick,
-  listEvents, createEvent, updateEvent, deleteEvent, toggleEvent
+  listEvents, createEvent, updateEvent, deleteEvent, toggleEvent,
+  listUsers, getUser, toggleUserAdmin, deleteUser, getUserStats
 }

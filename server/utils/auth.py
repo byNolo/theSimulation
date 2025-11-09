@@ -25,11 +25,19 @@ def upsert_user_from_token(token: str):
         return None
     user = User.query.filter_by(provider='keyn', provider_user_id=str(data.get('id'))).first()
     if not user:
-        user = User(provider='keyn', provider_user_id=str(data.get('id')), display_name=data.get('display_name') or data.get('username'))
+        user = User(
+            provider='keyn', 
+            provider_user_id=str(data.get('id')), 
+            display_name=data.get('display_name') or data.get('username'),
+            email=data.get('email')
+        )
         db.session.add(user)
         db.session.flush()
     else:
         user.display_name = data.get('display_name') or data.get('username') or user.display_name
+        # Update email if available
+        if data.get('email'):
+            user.email = data.get('email')
     db.session.commit()
     session['user_id'] = user.id
     return user

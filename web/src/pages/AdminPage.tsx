@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import api from '../services/api'
 import EventManager from '../components/EventManager'
+import UserManager from '../components/UserManager'
 
 const AdminPage: React.FC = () => {
   const [me, setMe] = useState<any>(null)
@@ -9,7 +10,7 @@ const AdminPage: React.FC = () => {
   const [telemetry, setTelemetry] = useState<any[] | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'overview' | 'events'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'users'>('overview')
 
   useEffect(() => {
     checkAuth()
@@ -139,6 +140,16 @@ const AdminPage: React.FC = () => {
               📊 Overview
             </button>
             <button
+              onClick={() => setActiveTab('users')}
+              className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+                activeTab === 'users'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 shadow-lg'
+                  : 'glass-effect-dark hover:bg-white/10'
+              }`}
+            >
+              👥 Users
+            </button>
+            <button
               onClick={() => setActiveTab('events')}
               className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
                 activeTab === 'events'
@@ -180,6 +191,7 @@ const AdminPage: React.FC = () => {
 
         {/* Tab Content */}
         {activeTab === 'events' && <EventManager />}
+        {activeTab === 'users' && <UserManager />}
 
         {activeTab === 'overview' && (
           <>
