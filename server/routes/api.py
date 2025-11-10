@@ -13,11 +13,90 @@ def est_today():
     return datetime.now(ZoneInfo('America/New_York')).date()
 
 
+def finalize_day(day):
+    """Apply the winning vote and update stats for a completed day"""
+    from ..events import deltas_for_option, ALL_EVENTS
+    
+    ws = WorldState.query.filter_by(day_id=day.id).first()
+    ev = Event.query.filter_by(day_id=day.id).first()
+    
+    if not ws or not ev:
+        return
+    
+    # Count votes
+    votes = Vote.query.filter_by(day_id=day.id).all()
+    tally = {}
+    for v in votes:
+        tally[v.option] = tally.get(v.option, 0) + 1
+    
+    # Determine winning option
+    if tally:
+        max_count = max(tally.values())
+        top_options = sorted([opt for opt, c in tally.items() if c == max_count])
+        top = top_options[0]  # If tie, alphabetically first
+    else:
+        # No votes - pick first option
+        top = ev.options[0]['key'] if isinstance(ev.options[0], dict) else ev.options[0]
+    
+    # Find the event template to get correct deltas
+    option_keys = set([opt['key'] if isinstance(opt, dict) else opt for opt in ev.options])
+    template = None
+    for t in ALL_EVENTS:
+        template_keys = set([opt.key for opt in t.options])
+        if template_keys == option_keys:
+            template = t
+            break
+    
+    deltas = deltas_for_option(top, template)
+    
+    # Apply changes with bounds checking
+    new_morale = max(0, min(100, ws.morale + deltas.get('morale', 0)))
+    new_supplies = max(0, min(100, ws.supplies + deltas.get('supplies', 0)))
+    new_threat = max(0, min(100, ws.threat + deltas.get('threat', 0)))
+    
+    # Update world state
+    ws.morale = new_morale
+    ws.supplies = new_supplies
+    ws.threat = new_threat
+    
+    # Get the option label if available
+    option_label = top
+    for opt in ev.options:
+        if isinstance(opt, dict) and opt.get('key') == top:
+            option_label = opt.get('label', top)
+            break
+    
+    ws.last_event = f"Community chose: {option_label}"
+    day.chosen_option = top
+    
+    # Save changes
+    db.session.add(ws)
+    db.session.add(day)
+    db.session.add(Telemetry(
+        event_type='auto_tick',
+        payload={
+            'day_id': day.id,
+            'chosen': top,
+            'tally': tally,
+            'deltas': deltas,
+            'new_state': {'morale': new_morale, 'supplies': new_supplies, 'threat': new_threat}
+        },
+        user_id=None
+    ))
+    db.session.commit()
+
+
 def ensure_today():
     today = est_today()
     day = Day.query.filter_by(est_date=today).first()
     if day:
         return day
+    
+    # Before creating new day, check if we need to finalize yesterday
+    yesterday = Day.query.order_by(Day.id.desc()).first()
+    if yesterday and yesterday.chosen_option is None:
+        # Yesterday ended but wasn't ticked - auto-finalize it
+        finalize_day(yesterday)
     
     # Get last state and count total days
     last_state = WorldState.query.order_by(WorldState.id.desc()).first()
