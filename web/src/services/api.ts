@@ -30,12 +30,20 @@ export async function getTally() {
   return fetchJson('/api/tally', { credentials: 'include' })
 }
 
+export async function getMyVote() {
+  return fetchJson('/api/my-vote', { credentials: 'include' })
+}
+
+export async function getHistory() {
+  return fetchJson('/api/history', { credentials: 'include' })
+}
+
 // Admin endpoints - require authenticated admin user
 export async function getMetrics() {
   return fetchJson('/api/admin/metrics', { credentials: 'include' })
 }
 
-export async function getHistory() {
+export async function getAdminHistory() {
   return fetchJson('/api/admin/history', { credentials: 'include' })
 }
 
@@ -121,8 +129,8 @@ export async function getUserStats() {
 }
 
 export default { 
-  getMe, getState, getEvent, vote, getTally, 
-  getMetrics, getHistory, getTelemetry, adminTick,
+  getMe, getState, getEvent, vote, getTally, getMyVote, getHistory,
+  getMetrics, getAdminHistory, getTelemetry, adminTick,
   listEvents, createEvent, updateEvent, deleteEvent, toggleEvent,
   listUsers, getUser, toggleUserAdmin, deleteUser, getUserStats
 }

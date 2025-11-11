@@ -20,7 +20,8 @@ const EventCard: React.FC<{
   submitting?: string | null; 
   message?: string | null;
   isAuthenticated?: boolean;
-}> = ({ event, onVote, tally = {}, submitting, message, isAuthenticated = false }) => {
+  currentVote?: string | null;
+}> = ({ event, onVote, tally = {}, submitting, message, isAuthenticated = false, currentVote = null }) => {
   const totalVotes = Object.values(tally).reduce((sum, val) => sum + val, 0)
   
   return (
@@ -74,7 +75,28 @@ const EventCard: React.FC<{
       )}
 
       {isAuthenticated && (
-        <div className="grid sm:grid-cols-3 gap-4">
+        <>
+          {currentVote && (
+            <div className="glass-effect-dark rounded-xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm">
+                <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-gray-300">
+                  You voted for: <span className="font-semibold text-white capitalize">
+                    {(() => {
+                      const foundOpt = event.options.find(opt => (typeof opt === 'string' ? opt : opt.key) === currentVote);
+                      if (!foundOpt) return currentVote;
+                      return typeof foundOpt === 'string' ? foundOpt : foundOpt.label;
+                    })()}
+                  </span>
+                </span>
+              </div>
+              <span className="text-xs text-gray-400">You can change your vote</span>
+            </div>
+          )}
+          
+          <div className="grid sm:grid-cols-3 gap-4">
           {event.options.map((opt, idx) => {
             // Support both old string format and new object format
             const optionKey = typeof opt === 'string' ? opt : opt.key
@@ -84,6 +106,7 @@ const EventCard: React.FC<{
             const votes = tally[optionKey] || 0
             const percentage = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0
             const isSubmitting = submitting === optionKey
+            const isCurrentVote = currentVote === optionKey
             const gradients = [
               'from-blue-600 to-indigo-600',
               'from-purple-600 to-pink-600',
@@ -97,7 +120,7 @@ const EventCard: React.FC<{
                 onClick={() => onVote(optionKey)}
                 className={`glass-effect-dark hover:bg-white/15 active:scale-95 transition-all duration-200 rounded-xl p-5 flex flex-col gap-3 relative overflow-hidden group ${
                   isSubmitting ? 'animate-pulse' : ''
-                }`}
+                } ${isCurrentVote ? 'ring-2 ring-green-500/50' : ''}`}
               >
                 {/* Progress bar background */}
                 {totalVotes > 0 && (
@@ -108,6 +131,16 @@ const EventCard: React.FC<{
                 )}
                 
                 <div className="relative z-10 flex flex-col gap-2">
+                  {/* Current vote indicator */}
+                  {isCurrentVote && (
+                    <div className="flex items-center gap-1 text-xs text-green-400">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Your vote</span>
+                    </div>
+                  )}
+                  
                   {/* Option text */}
                   <span className="font-semibold text-lg capitalize text-left group-hover:text-white transition-colors">
                     {optionLabel}
@@ -139,6 +172,7 @@ const EventCard: React.FC<{
             )
           })}
         </div>
+        </>
       )}
 
       {/* Message feedback */}

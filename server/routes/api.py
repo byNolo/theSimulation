@@ -207,7 +207,18 @@ def api_vote():
     # Check if user already voted
     existing = Vote.query.filter_by(day_id=day.id, user_id=user_id).first()
     if existing:
-        return jsonify({'error': 'Already voted today'}), 409
+        # Allow vote change
+        old_choice = existing.option
+        existing.option = choice
+        existing.updated_at = datetime.utcnow()
+        db.session.add(Telemetry(
+            event_type='vote_changed', 
+            payload={'old_choice': old_choice, 'new_choice': choice}, 
+            user_id=user_id
+        ))
+        db.session.commit()
+        tally = tally_for_day(day.id)
+        return jsonify({'ok': True, 'choice': choice, 'tally': tally, 'changed': True})
     
     vote = Vote(day_id=day.id, option=choice, user_id=user_id, anon_id=None)
     db.session.add(vote)
@@ -221,6 +232,69 @@ def api_vote():
     
     tally = tally_for_day(day.id)
     return jsonify({'ok': True, 'choice': choice, 'tally': tally})
+
+
+@api_bp.route('/my-vote')
+def api_my_vote():
+    """Get current user's vote for today"""
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'voted': False})
+    
+    day, _, _ = get_current()
+    vote = Vote.query.filter_by(day_id=day.id, user_id=user_id).first()
+    
+    if vote:
+        return jsonify({'voted': True, 'choice': vote.option, 'created_at': vote.created_at.isoformat(), 'updated_at': vote.updated_at.isoformat()})
+    else:
+        return jsonify({'voted': False})
+
+
+@api_bp.route('/history')
+def api_history():
+    """Get history of past events and outcomes"""
+    # Get all days that have been finalized (chosen_option is not null)
+    days = Day.query.filter(Day.chosen_option.isnot(None)).order_by(Day.id.desc()).limit(30).all()
+    
+    history = []
+    for day in days:
+        ws = WorldState.query.filter_by(day_id=day.id).first()
+        ev = Event.query.filter_by(day_id=day.id).first()
+        
+        if not ws or not ev:
+            continue
+        
+        # Get vote tally for this day
+        tally = tally_for_day(day.id)
+        
+        # Find the chosen option details
+        chosen_option_label = day.chosen_option
+        chosen_option_desc = None
+        for opt in ev.options:
+            if isinstance(opt, dict) and opt.get('key') == day.chosen_option:
+                chosen_option_label = opt.get('label', day.chosen_option)
+                chosen_option_desc = opt.get('description')
+                break
+        
+        history.append({
+            'day': day.id,
+            'date': day.est_date.isoformat(),
+            'headline': ev.headline,
+            'description': ev.description,
+            'options': ev.options,
+            'chosen_option': day.chosen_option,
+            'chosen_option_label': chosen_option_label,
+            'chosen_option_description': chosen_option_desc,
+            'tally': tally,
+            'state': {
+                'morale': ws.morale,
+                'supplies': ws.supplies,
+                'threat': ws.threat,
+                'last_event': ws.last_event
+            }
+        })
+    
+    return jsonify(history)
 
 
 

@@ -34,14 +34,14 @@ const AdminPage: React.FC = () => {
 
   const loadAll = async () => {
     try {
-      const [m, h, tel] = await Promise.all([
+      const [metrics, history, telemetry] = await Promise.all([
         api.getMetrics(),
-        api.getHistory(),
-        api.getTelemetry()
+        api.getAdminHistory(),
+        api.getTelemetry(),
       ])
-      setMetrics(m)
-      setHistory(h)
-      setTelemetry(tel)
+      setMetrics(metrics)
+      setHistory(history)
+      setTelemetry(telemetry)
       setMsg(null)
     } catch (e: any) {
       setMsg(e?.error || e?.message || String(e))

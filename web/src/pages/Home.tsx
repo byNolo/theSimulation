@@ -3,6 +3,7 @@ import useFetch from '../hooks/useFetch'
 import { default as api } from '../services/api'
 import StatBar from '../components/StatBar'
 import EventCard from '../components/EventCard'
+import EventHistory from '../components/EventHistory'
 import Header from '../components/Header'
 import WelcomeModal from '../components/WelcomeModal'
 
@@ -16,6 +17,8 @@ const Home: React.FC = () => {
   const [tally, setTally] = useState<Record<string, number>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [me, setMe] = useState<any>(null)
+  const [currentVote, setCurrentVote] = useState<string | null>(null)
+  const [history, setHistory] = useState<any[]>([])
 
   // Fetch user info
   useEffect(() => {
@@ -28,6 +31,36 @@ const Home: React.FC = () => {
       }
     }
     fetchMe()
+  }, [])
+
+  // Fetch current vote
+  useEffect(() => {
+    const fetchMyVote = async () => {
+      try {
+        const data = await api.getMyVote()
+        if (data.voted) {
+          setCurrentVote(data.choice)
+        }
+      } catch (e) {
+        console.error('Failed to fetch vote:', e)
+      }
+    }
+    if (me?.authenticated) {
+      fetchMyVote()
+    }
+  }, [me])
+
+  // Fetch event history
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const data = await api.getHistory()
+        setHistory(data)
+      } catch (e) {
+        console.error('Failed to fetch history:', e)
+      }
+    }
+    fetchHistory()
   }, [])
 
   // Fetch initial tally
@@ -52,7 +85,12 @@ const Home: React.FC = () => {
     try {
       const json = await api.vote(choice)
       setTally(json.tally || {})
-      setMessage(`Registered vote for ${choice}`)
+      setCurrentVote(choice)
+      if (json.changed) {
+        setMessage(`Changed vote to ${choice}`)
+      } else {
+        setMessage(`Registered vote for ${choice}`)
+      }
     } catch (e:any) {
       setMessage(e?.error || e?.message || String(e))
     } finally {
@@ -158,8 +196,12 @@ const Home: React.FC = () => {
             submitting={submitting} 
             message={message}
             isAuthenticated={me?.authenticated || false}
+            currentVote={currentVote}
           />
         )}
+
+        {/* Event history */}
+        <EventHistory history={history} />
 
         {/* Footer */}
         <footer className="glass-effect rounded-xl p-6 mt-12">
@@ -179,7 +221,7 @@ const Home: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <span className="px-3 py-1 glass-effect-dark rounded-full">Beta v0.1</span>
+              <span className="px-3 py-1 glass-effect-dark rounded-full">Beta v0.1.1</span>
               {me?.authenticated && me?.user?.is_admin && (
                 <a href="/admin" className="px-3 py-1 glass-effect-dark rounded-full hover:bg-white/10 transition-colors">
                   Admin

@@ -58,6 +58,7 @@ class Vote(db.Model):
     anon_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     option: Mapped[str] = mapped_column(String(50))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
         UniqueConstraint('day_id', 'user_id', name='uq_vote_user_per_day'),

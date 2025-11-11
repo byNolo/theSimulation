@@ -1,4 +1,4 @@
-# New Features Added - November 8, 2025
+# New Features Added - November 8-10, 2025
 
 ## ✅ 1. First-Time User Welcome Modal
 
@@ -55,6 +55,82 @@
 
 ---
 
+## ✅ 4. Vote Changing (November 10, 2025)
+
+**What it does:**
+- Users can now change their vote if they accidentally clicked the wrong option
+- Shows which option the user voted for with visual indicators
+- Displays message "You can change your vote"
+- Tracks vote changes in telemetry for analytics
+
+**Backend Changes:**
+- **`server/models.py`**: Added `updated_at` timestamp to `Vote` model
+- **`server/routes/api.py`**: 
+  - Modified `/api/vote` endpoint to update existing votes instead of returning error
+  - Added `/api/my-vote` endpoint to retrieve user's current vote
+  - Logs vote changes with event type `vote_changed`
+
+**Frontend Changes:**
+- **`web/src/components/EventCard.tsx`**:
+  - Accepts `currentVote` prop to highlight user's current selection
+  - Shows banner indicating which option the user voted for
+  - Adds visual ring around the selected option
+  - Displays "Your vote" badge on chosen option
+- **`web/src/pages/Home.tsx`**:
+  - Fetches current vote status on load
+  - Updates UI when vote is changed
+  - Shows different messages for initial vote vs. vote change
+- **`web/src/services/api.ts`**: Added `getMyVote()` function
+
+**Migration Required:**
+```bash
+cd server
+.venv/bin/python scripts/add_vote_updated_at.py
+```
+
+---
+
+## ✅ 5. Event History (November 10, 2025)
+
+**What it does:**
+- Users can now view the history of past events
+- See what options were presented and which option won
+- View voting results with percentages
+- See world state (morale, supplies, threat) at that time
+- Expandable/collapsible cards for easy browsing
+
+**Backend Changes:**
+- **`server/routes/api.py`**: Added `/api/history` endpoint that returns:
+  - Past 30 finalized days (days where voting concluded)
+  - Event details (headline, description, options)
+  - Chosen option with vote counts and percentages
+  - World state at that time
+
+**Frontend Changes:**
+- **`web/src/components/EventHistory.tsx`**: New component that:
+  - Displays past events in collapsible cards
+  - Shows day number, date, and headline
+  - Highlights the winning option
+  - Expandable view shows full details with vote distribution
+  - Visual progress bars for each option
+  - World state stats at that time
+- **`web/src/pages/Home.tsx`**: Displays EventHistory component below current event
+- **`web/src/services/api.ts`**: 
+  - Added `getHistory()` function
+  - Renamed admin history to `getAdminHistory()` to avoid conflicts
+
+**User Experience:**
+1. Scroll down to see Event History section
+2. Each event shows as a collapsed card with key info
+3. Click to expand and see full details:
+   - All options that were available
+   - Vote distribution with percentages
+   - Visual progress bars
+   - World state metrics at that time
+4. Green checkmark highlights the winning option
+
+---
+
 ## Next Steps (Optional)
 
 ### To add PNG favicons and OG image:
@@ -71,6 +147,8 @@
 - SVG favicon works right now ✅
 - Social meta tags work right now ✅
 - Welcome modal works right now ✅
+- Vote changing works right now ✅
+- Event history works right now ✅
 - PNG icons are optional extras for maximum compatibility
 
 ---
@@ -88,6 +166,18 @@
    - Share `https://thesim.bynolo.ca` in Discord
    - Should show title, description, and preview card
 
+4. **Vote Changing:**
+   - Sign in and vote on the current event
+   - Click a different option
+   - Verify the vote updates and message shows "Changed vote to..."
+   - Refresh the page and verify your new vote is still selected
+
+5. **Event History:**
+   - Scroll down to the Event History section
+   - Click on a past event to expand it
+   - Verify all data displays correctly
+   - Test collapsing/expanding multiple events
+
 ---
 
-All features are live in production! 🎉
+All features are live! 🎉
