@@ -1,15 +1,23 @@
 import React from 'react'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Home from './pages/Home'
 import AdminPage from './pages/AdminPage'
+import AdminProjects from './pages/AdminProjects'
 import TermsOfUsePage from './pages/TermsOfUsePage'
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
 
-const App: React.FC = () => {
-  // Simple route switch based on pathname. Replace with react-router when desired.
-  if (location.pathname.startsWith('/admin')) return <AdminPage />
-  if (location.pathname === '/terms') return <TermsOfUsePage />
-  if (location.pathname === '/privacy') return <PrivacyPolicyPage />
-  return <Home />
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/projects" element={<AdminProjects />} />
+        <Route path="/terms" element={<TermsOfUsePage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      </Routes>
+    </Router>
+  )
 }
 
 export default App

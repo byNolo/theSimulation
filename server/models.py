@@ -3,6 +3,8 @@ from typing import Optional
 from sqlalchemy import Integer, String, DateTime, Date, ForeignKey, UniqueConstraint, JSON, Boolean, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import db
+# Import project models to ensure they are registered with SQLAlchemy
+from .models_projects import Project, ActiveProject, CompletedProject, ProjectVote
 
 
 class User(db.Model):

@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, session, request
 from ..utils.decorators import require_admin
 from ..routes.api import get_current, tally_for_day
 from ..models import WorldState, Vote, Telemetry, Event, CustomEvent, User
+from ..models_projects import Project, ActiveProject, CompletedProject, ProjectVote
 from ..db import db
 from ..events import deltas_for_option, ALL_EVENTS
 from datetime import datetime
@@ -106,6 +107,63 @@ def api_tick():
     db.session.add(ws)
     db.session.add(day)
     db.session.add(Telemetry(event_type='tick', payload=telemetry_payload, user_id=user_id))
+    
+    # ====== PROJECT PROGRESSION ======
+    production = int((new_morale * 0.1) + (new_supplies * 0.1))
+    
+    active_proj = ActiveProject.query.first()
+    project_msg = None
+    
+    if active_proj:
+        active_proj.progress += production
+        if active_proj.progress >= active_proj.project.cost:
+            # Complete project
+            completed = CompletedProject(project_id=active_proj.project_id)
+            db.session.add(completed)
+            project_msg = f"Project Completed: {active_proj.project.name}"
+            
+            # Log completion
+            db.session.add(Telemetry(
+                event_type='project_complete',
+                payload={'project_id': active_proj.project_id, 'name': active_proj.project.name},
+                user_id=user_id
+            ))
+            
+            db.session.delete(active_proj)
+            active_proj = None
+        else:
+            project_msg = f"Project Progress: {active_proj.project.name} (+{production})"
+            
+    # If no active project (or just finished), check votes to start new one
+    if not active_proj:
+        # Get all votes
+        p_votes = ProjectVote.query.all()
+        if p_votes:
+            tally = {}
+            for v in p_votes:
+                tally[v.project_id] = tally.get(v.project_id, 0) + 1
+            
+            if tally:
+                # Pick winner
+                winner_id = max(tally, key=tally.get)
+                # Verify not completed
+                if not CompletedProject.query.filter_by(project_id=winner_id).first():
+                    new_active = ActiveProject(project_id=winner_id)
+                    db.session.add(new_active)
+                    proj = Project.query.get(winner_id)
+                    project_msg = f"Construction Started: {proj.name}" if not project_msg else f"{project_msg} | Started: {proj.name}"
+                    
+                    # Log start
+                    db.session.add(Telemetry(
+                        event_type='project_start',
+                        payload={'project_id': winner_id, 'name': proj.name},
+                        user_id=user_id
+                    ))
+                    
+                    # Clear votes
+                    for v in p_votes:
+                        db.session.delete(v)
+
     db.session.commit()
     
     # Create next day for preview (unless game over)
@@ -130,6 +188,64 @@ def api_tick():
         response['reason'] = game_over_reason
     
     return jsonify(response)
+
+@admin_bp.route('/projects', methods=['GET'])
+@require_admin
+def list_projects():
+    """List all projects including hidden ones"""
+    projects = Project.query.all()
+    return jsonify([{
+        'id': p.id,
+        'name': p.name,
+        'description': p.description,
+        'cost': p.cost,
+        'buff_type': p.buff_type,
+        'buff_value': p.buff_value,
+        'icon': p.icon,
+        'hidden': p.hidden,
+        'required_project_id': p.required_project_id
+    } for p in projects])
+
+@admin_bp.route('/projects', methods=['POST'])
+@require_admin
+def create_project():
+    """Create a new project"""
+    data = request.json
+    
+    project = Project(
+        name=data['name'],
+        description=data['description'],
+        cost=int(data['cost']),
+        buff_type=data['buff_type'],
+        buff_value=int(data['buff_value']),
+        icon=data['icon'],
+        hidden=data.get('hidden', True),  # Default to hidden
+        required_project_id=data.get('required_project_id')
+    )
+    
+    db.session.add(project)
+    db.session.commit()
+    
+    return jsonify({'ok': True, 'id': project.id})
+
+@admin_bp.route('/projects/<int:project_id>', methods=['PUT'])
+@require_admin
+def update_project(project_id):
+    """Update a project"""
+    project = Project.query.get_or_404(project_id)
+    data = request.json
+    
+    if 'name' in data: project.name = data['name']
+    if 'description' in data: project.description = data['description']
+    if 'cost' in data: project.cost = int(data['cost'])
+    if 'buff_type' in data: project.buff_type = data['buff_type']
+    if 'buff_value' in data: project.buff_value = int(data['buff_value'])
+    if 'icon' in data: project.icon = data['icon']
+    if 'hidden' in data: project.hidden = data['hidden']
+    if 'required_project_id' in data: project.required_project_id = data['required_project_id']
+    
+    db.session.commit()
+    return jsonify({'ok': True})
 
 
 @admin_bp.route('/metrics', methods=['GET'])

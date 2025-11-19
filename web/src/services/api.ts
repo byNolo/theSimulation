@@ -42,6 +42,19 @@ export async function getCommunityMessages() {
   return fetchJson('/api/messages', { credentials: 'include' })
 }
 
+export async function getProjects() {
+  return fetchJson('/api/projects')
+}
+
+export async function voteProject(projectId: number) {
+  return fetchJson('/api/projects/vote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project_id: projectId }),
+    credentials: 'include'
+  })
+}
+
 // Admin endpoints - require authenticated admin user
 export async function getMetrics() {
   return fetchJson('/api/admin/metrics', { credentials: 'include' })
@@ -137,5 +150,5 @@ export default {
   getMetrics, getAdminHistory, getTelemetry, adminTick,
   listEvents, createEvent, updateEvent, deleteEvent, toggleEvent,
   listUsers, getUser, toggleUserAdmin, deleteUser, getUserStats,
-  getCommunityMessages
+  getCommunityMessages, getProjects, voteProject
 }

@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 from datetime import datetime
 from ..db import db
 from ..models import Day, WorldState, Event, Vote, Telemetry, User
+from ..models_projects import Project, ActiveProject, CompletedProject, ProjectVote
 from ..events import choose_template
 from sqlalchemy.exc import IntegrityError
 
@@ -209,6 +210,7 @@ def api_state():
         'threat': ws.threat,
         'last_event': ws.last_event,
         'est_date': day.est_date.isoformat(),
+        'production': int((ws.morale * 0.1) + (ws.supplies * 0.1)),  # Base production formula
     })
 
 
@@ -474,3 +476,105 @@ def api_messages():
 
 
 
+
+# ====== PROJECT ENDPOINTS ======
+
+@api_bp.route('/projects')
+def api_projects():
+    """Get all project data"""
+    # Get all available projects (not hidden)
+    projects = Project.query.filter_by(hidden=False).all()
+    
+    # Get active project (under construction)
+    active = ActiveProject.query.first()
+    
+    # Get completed projects
+    completed = CompletedProject.query.all()
+    completed_ids = [p.project_id for p in completed]
+    
+    # Get current vote tally for next project
+    day, _, _ = get_current()
+    votes = ProjectVote.query.filter_by(day_id=day.id).all()
+    tally = {}
+    for v in votes:
+        tally[v.project_id] = tally.get(v.project_id, 0) + 1
+        
+    # Format response
+    projects_data = []
+    for p in projects:
+        if p.id in completed_ids:
+            status = 'completed'
+        elif active and active.project_id == p.id:
+            status = 'active'
+        else:
+            status = 'available'
+            
+        projects_data.append({
+            'id': p.id,
+            'name': p.name,
+            'description': p.description,
+            'cost': p.cost,
+            'buff_type': p.buff_type,
+            'buff_value': p.buff_value,
+            'icon': p.icon,
+            'status': status,
+            'votes': tally.get(p.id, 0)
+        })
+        
+    active_data = None
+    if active:
+        active_data = {
+            'id': active.id,
+            'project_id': active.project_id,
+            'name': active.project.name,
+            'progress': active.progress,
+            'target': active.project.cost,
+            'percentage': int((active.progress / active.project.cost) * 100)
+        }
+        
+    return jsonify({
+        'projects': projects_data,
+        'active_project': active_data,
+        'completed_count': len(completed)
+    })
+
+
+@api_bp.route('/projects/vote', methods=['POST'])
+def api_project_vote():
+    """Vote for the next project to build"""
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Authentication required'}), 401
+        
+    data = request.get_json(force=True)
+    project_id = data.get('project_id')
+    
+    if not project_id:
+        return jsonify({'error': 'Missing project_id'}), 400
+        
+    # Validate project exists and is not completed/active
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+        
+    # Check if already completed or active
+    if CompletedProject.query.filter_by(project_id=project_id).first():
+        return jsonify({'error': 'Project already completed'}), 400
+        
+    if ActiveProject.query.filter_by(project_id=project_id).first():
+        return jsonify({'error': 'Project currently under construction'}), 400
+        
+    day, _, _ = get_current()
+    
+    # Check if user already voted for a project today
+    existing = ProjectVote.query.filter_by(day_id=day.id, user_id=user_id).first()
+    if existing:
+        existing.project_id = project_id
+        db.session.commit()
+        return jsonify({'ok': True, 'message': 'Vote updated'})
+        
+    vote = ProjectVote(day_id=day.id, user_id=user_id, project_id=project_id)
+    db.session.add(vote)
+    db.session.commit()
+    
+    return jsonify({'ok': True, 'message': 'Vote registered'})

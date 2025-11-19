@@ -7,8 +7,9 @@ import EventHistory from '../components/EventHistory'
 import CommunityBoard from '../components/CommunityBoard'
 import Header from '../components/Header'
 import WelcomeModal from '../components/WelcomeModal'
+import BaseDashboard from '../components/BaseDashboard'
 
-type WorldState = { day: number; morale: number; supplies: number; threat: number; last_event: string }
+type WorldState = { day: number; morale: number; supplies: number; threat: number; last_event: string; production?: number }
 type EventData = { day: number; headline: string; description: string; options: string[] }
 
 const Home: React.FC = () => {
@@ -21,6 +22,7 @@ const Home: React.FC = () => {
   const [currentVote, setCurrentVote] = useState<string | null>(null)
   const [history, setHistory] = useState<any[]>([])
   const [messages, setMessages] = useState<any[]>([])
+  const [projectsData, setProjectsData] = useState<any>(null)
 
   // Fetch user info
   useEffect(() => {
@@ -78,6 +80,23 @@ const Home: React.FC = () => {
     fetchMessages()
   }, [])
 
+  // Fetch projects
+  const fetchProjects = async () => {
+    try {
+      const data = await api.getProjects()
+      setProjectsData(data)
+    } catch (e) {
+      console.error('Failed to fetch projects:', e)
+    }
+  }
+
+  useEffect(() => {
+    fetchProjects()
+    // Refresh projects occasionally
+    const interval = setInterval(fetchProjects, 10000)
+    return () => clearInterval(interval)
+  }, [])
+
   // Fetch initial tally
   useEffect(() => {
     const fetchTally = async () => {
@@ -110,6 +129,17 @@ const Home: React.FC = () => {
       setMessage(e?.error || e?.message || String(e))
     } finally {
       setSubmitting(null)
+    }
+  }
+
+  const handleProjectVote = async (projectId: number) => {
+    try {
+      await api.voteProject(projectId)
+      // Refresh projects to show updated vote count
+      fetchProjects()
+    } catch (e: any) {
+      console.error('Project vote failed:', e)
+      alert(e.message || 'Failed to vote for project')
     }
   }
 
@@ -195,10 +225,11 @@ const Home: React.FC = () => {
 
         {/* World stats */}
         {world && (
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <StatBar label="Morale" value={world.morale} color="#10b981" />
             <StatBar label="Supplies" value={world.supplies} color="#f59e0b" />
             <StatBar label="Threat" value={world.threat} color="#ef4444" />
+            <StatBar label="Production" value={world.production || 0} color="#3b82f6" max={50} />
           </div>
         )}
 
@@ -212,6 +243,17 @@ const Home: React.FC = () => {
             message={message}
             isAuthenticated={me?.authenticated || false}
             currentVote={currentVote}
+          />
+        )}
+
+        {/* Base Dashboard */}
+        {projectsData && (
+          <BaseDashboard
+            projects={projectsData.projects}
+            activeProject={projectsData.active_project}
+            completedCount={projectsData.completed_count}
+            onVote={handleProjectVote}
+            isAuthenticated={me?.authenticated || false}
           />
         )}
 
@@ -243,7 +285,7 @@ const Home: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <span className="px-3 py-1 glass-effect-dark rounded-full">Beta v0.1.2</span>
+              <span className="px-3 py-1 glass-effect-dark rounded-full">Beta v0.2.0</span>
               {me?.authenticated && me?.user?.is_admin && (
                 <a href="/admin" className="px-3 py-1 glass-effect-dark rounded-full hover:bg-white/10 transition-colors">
                   Admin

@@ -51,7 +51,7 @@ const CommunityBoard: React.FC<Props> = ({ messages }) => {
                 </span>
             </div>
 
-            <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-4 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
                 {messages.map((msg) => (
                     <div key={msg.id} className="space-y-2">
                         {/* Main Message */}
