@@ -176,18 +176,30 @@ def api_history():
         tally = {}
         for v in votes:
             tally[v.option] = tally.get(v.option, 0) + 1
+            
+        # Get option label
+        chosen_label = d.chosen_option
+        if ev and d.chosen_option:
+            for opt in ev.options:
+                if isinstance(opt, dict) and opt.get('key') == d.chosen_option:
+                    chosen_label = opt.get('label', d.chosen_option)
+                    break
+                elif hasattr(opt, 'key') and opt.key == d.chosen_option:
+                    chosen_label = getattr(opt, 'label', d.chosen_option)
+                    break
+
         result.append({
             'est_date': d.est_date.isoformat(),
-            'chosen_option': d.chosen_option,
+            'chosen_option': chosen_label,
             'world': {
-                'morale': ws.morale,
-                'supplies': ws.supplies,
-                'threat': ws.threat,
-                'last_event': ws.last_event,
+                'morale': ws.morale if ws else 0,
+                'supplies': ws.supplies if ws else 0,
+                'threat': ws.threat if ws else 0,
+                'last_event': ws.last_event if ws else "No data",
             },
             'event': {
-                'headline': ev.headline,
-                'options': ev.options,
+                'headline': ev.headline if ev else "No event",
+                'options': ev.options if ev else [],
             },
             'tally': tally,
         })

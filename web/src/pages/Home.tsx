@@ -4,6 +4,7 @@ import { default as api } from '../services/api'
 import StatBar from '../components/StatBar'
 import EventCard from '../components/EventCard'
 import EventHistory from '../components/EventHistory'
+import CommunityBoard from '../components/CommunityBoard'
 import Header from '../components/Header'
 import WelcomeModal from '../components/WelcomeModal'
 
@@ -19,6 +20,7 @@ const Home: React.FC = () => {
   const [me, setMe] = useState<any>(null)
   const [currentVote, setCurrentVote] = useState<string | null>(null)
   const [history, setHistory] = useState<any[]>([])
+  const [messages, setMessages] = useState<any[]>([])
 
   // Fetch user info
   useEffect(() => {
@@ -63,6 +65,19 @@ const Home: React.FC = () => {
     fetchHistory()
   }, [])
 
+  // Fetch community messages
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const data = await api.getCommunityMessages()
+        setMessages(data)
+      } catch (e) {
+        console.error('Failed to fetch messages:', e)
+      }
+    }
+    fetchMessages()
+  }, [])
+
   // Fetch initial tally
   useEffect(() => {
     const fetchTally = async () => {
@@ -91,7 +106,7 @@ const Home: React.FC = () => {
       } else {
         setMessage(`Registered vote for ${choice}`)
       }
-    } catch (e:any) {
+    } catch (e: any) {
       setMessage(e?.error || e?.message || String(e))
     } finally {
       setSubmitting(null)
@@ -101,7 +116,7 @@ const Home: React.FC = () => {
   // Determine simulation status for dynamic backgrounds
   const getSimulationStatus = () => {
     if (!world) return 'stable'
-    
+
     const criticalStats = [
       world.morale < 30,
       world.supplies < 30,
@@ -118,7 +133,7 @@ const Home: React.FC = () => {
 
   // Dynamic background colors based on status
   const getBackgroundEffects = () => {
-    switch(status) {
+    switch (status) {
       case 'critical':
         return {
           orb1: 'bg-red-600/30',
@@ -155,7 +170,7 @@ const Home: React.FC = () => {
   return (
     <div className="min-h-screen p-6 max-w-6xl mx-auto relative">
       {/* Welcome Modal for first-time users */}
-      <WelcomeModal 
+      <WelcomeModal
         isAuthenticated={me?.authenticated || false}
         username={me?.user?.username}
       />
@@ -168,9 +183,9 @@ const Home: React.FC = () => {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-red-900/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }} />
         )}
       </div>
-      
+
       {/* Vignette overlay for atmosphere */}
-      <div 
+      <div
         className="fixed inset-0 -z-10 pointer-events-none"
         style={{ background: bgEffects.vignette }}
       />
@@ -189,11 +204,11 @@ const Home: React.FC = () => {
 
         {/* Current event */}
         {event && (
-          <EventCard 
-            event={event} 
-            onVote={vote} 
-            tally={tally} 
-            submitting={submitting} 
+          <EventCard
+            event={event}
+            onVote={vote}
+            tally={tally}
+            submitting={submitting}
             message={message}
             isAuthenticated={me?.authenticated || false}
             currentVote={currentVote}
@@ -201,7 +216,14 @@ const Home: React.FC = () => {
         )}
 
         {/* Event history */}
-        <EventHistory history={history} />
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="md:col-span-2">
+            <EventHistory history={history} />
+          </div>
+          <div className="md:col-span-1">
+            <CommunityBoard messages={messages} />
+          </div>
+        </div>
 
         {/* Footer */}
         <footer className="glass-effect rounded-xl p-6 mt-12">
@@ -221,7 +243,7 @@ const Home: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <span className="px-3 py-1 glass-effect-dark rounded-full">Beta v0.1.1</span>
+              <span className="px-3 py-1 glass-effect-dark rounded-full">Beta v0.1.2</span>
               {me?.authenticated && me?.user?.is_admin && (
                 <a href="/admin" className="px-3 py-1 glass-effect-dark rounded-full hover:bg-white/10 transition-colors">
                   Admin

@@ -25,6 +25,7 @@ class Day(db.Model):
 
     world_state: Mapped['WorldState'] = relationship(back_populates='day', uselist=False)
     event: Mapped['Event'] = relationship(back_populates='day', uselist=False)
+    messages: Mapped[list['CommunityMessage']] = relationship(back_populates='day')
 
 
 class WorldState(db.Model):
@@ -100,3 +101,20 @@ class CustomEvent(db.Model):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CommunityMessage(db.Model):
+    __tablename__ = 'community_messages'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    day_id: Mapped[int] = mapped_column(ForeignKey('days.id'))
+    author_name: Mapped[str] = mapped_column(String(64))
+    avatar_seed: Mapped[str] = mapped_column(String(64))  # For deterministic avatars
+    content: Mapped[str] = mapped_column(String(280))
+    sentiment: Mapped[str] = mapped_column(String(20))  # positive, negative, neutral
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # Replies support
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey('community_messages.id'), nullable=True)
+    replies: Mapped[list['CommunityMessage']] = relationship('CommunityMessage', backref=db.backref('parent', remote_side=[id]))
+
+    day: Mapped[Day] = relationship(back_populates='messages')

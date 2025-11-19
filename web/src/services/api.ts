@@ -18,11 +18,11 @@ export async function getEvent() {
 }
 
 export async function vote(choice: string) {
-  return fetchJson('/api/vote', { 
-    method: 'POST', 
-    headers: { 'Content-Type': 'application/json' }, 
-    body: JSON.stringify({ choice }), 
-    credentials: 'include' 
+  return fetchJson('/api/vote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ choice }),
+    credentials: 'include'
   })
 }
 
@@ -36,6 +36,10 @@ export async function getMyVote() {
 
 export async function getHistory() {
   return fetchJson('/api/history', { credentials: 'include' })
+}
+
+export async function getCommunityMessages() {
+  return fetchJson('/api/messages', { credentials: 'include' })
 }
 
 // Admin endpoints - require authenticated admin user
@@ -52,9 +56,9 @@ export async function getTelemetry() {
 }
 
 export async function adminTick() {
-  return fetchJson('/api/admin/tick', { 
-    method: 'POST', 
-    credentials: 'include' 
+  return fetchJson('/api/admin/tick', {
+    method: 'POST',
+    credentials: 'include'
   })
 }
 
@@ -97,14 +101,14 @@ export async function toggleEvent(dbId: number) {
 
 // User management endpoints
 export async function listUsers(page = 1, perPage = 50) {
-  return fetchJson(`/api/admin/users?page=${page}&per_page=${perPage}`, { 
-    credentials: 'include' 
+  return fetchJson(`/api/admin/users?page=${page}&per_page=${perPage}`, {
+    credentials: 'include'
   })
 }
 
 export async function getUser(userId: number) {
-  return fetchJson(`/api/admin/users/${userId}`, { 
-    credentials: 'include' 
+  return fetchJson(`/api/admin/users/${userId}`, {
+    credentials: 'include'
   })
 }
 
@@ -123,14 +127,15 @@ export async function deleteUser(userId: number) {
 }
 
 export async function getUserStats() {
-  return fetchJson('/api/admin/users/stats', { 
-    credentials: 'include' 
+  return fetchJson('/api/admin/users/stats', {
+    credentials: 'include'
   })
 }
 
-export default { 
+export default {
   getMe, getState, getEvent, vote, getTally, getMyVote, getHistory,
   getMetrics, getAdminHistory, getTelemetry, adminTick,
   listEvents, createEvent, updateEvent, deleteEvent, toggleEvent,
-  listUsers, getUser, toggleUserAdmin, deleteUser, getUserStats
+  listUsers, getUser, toggleUserAdmin, deleteUser, getUserStats,
+  getCommunityMessages
 }

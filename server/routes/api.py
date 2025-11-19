@@ -83,6 +83,41 @@ def finalize_day(day):
         },
         user_id=None
     ))
+    
+    # Generate reaction messages for the finalized day
+    from ..utils.message_generator import generate_messages_for_day
+    from ..models import CommunityMessage
+    
+    # We want to generate some messages reacting to the decision
+    # Use the NEXT day's ID if we were creating it, but here we are just finalizing the current day.
+    # Actually, reactions usually happen on the NEXT day or late in the current day.
+    # Let's add them to the current day for now, or maybe they should belong to the next day?
+    # Usually "Day X" messages appear on Day X.
+    # If we finalize Day X, we are about to start Day X+1.
+    # So these reactions should probably be the first messages of Day X+1.
+    # But finalize_day is called before ensure_today creates the new day.
+    # So we can't add them to Day X+1 yet.
+    # Let's add them to Day X as "late night" reactions.
+    
+    reaction_msgs = generate_messages_for_day(
+        day.id, 
+        ev.category if hasattr(ev, 'category') else 'general', 
+        ws, 
+        event_headline=ev.headline,
+        chosen_option_label=option_label
+    )
+    
+    for msg_data in reaction_msgs:
+        replies_data = msg_data.pop('replies', [])
+        msg = CommunityMessage(**msg_data)
+        db.session.add(msg)
+        db.session.flush()
+        
+        for reply_data in replies_data:
+            reply_data['parent_id'] = msg.id
+            reply = CommunityMessage(**reply_data)
+            db.session.add(reply)
+
     db.session.commit()
 
 
@@ -121,6 +156,27 @@ def ensure_today():
     ws = WorldState(day_id=day.id, morale=morale, supplies=supplies, threat=threat, last_event=last_event)
     ev = Event(day_id=day.id, headline=template.headline, description=template.description, options=option_data)
     db.session.add_all([ws, ev])
+    
+    # Generate community messages
+    from ..utils.message_generator import generate_messages_for_day
+    from ..models import CommunityMessage
+    
+    # Get context for messages
+    # For a new day, we might not have a chosen option yet (it's the start of the day)
+    # But we have the event headline
+    msgs_data = generate_messages_for_day(day.id, template.category, ws, event_headline=template.headline)
+    
+    for msg_data in msgs_data:
+        replies_data = msg_data.pop('replies', [])
+        msg = CommunityMessage(**msg_data)
+        db.session.add(msg)
+        db.session.flush() # Flush to get ID
+        
+        for reply_data in replies_data:
+            reply_data['parent_id'] = msg.id
+            reply = CommunityMessage(**reply_data)
+            db.session.add(reply)
+        
     db.session.commit()
     return day
 
@@ -295,6 +351,126 @@ def api_history():
         })
     
     return jsonify(history)
+
+
+@api_bp.route('/messages')
+def api_messages():
+    """Get community messages for the last 4 days"""
+    day, _, _ = get_current()
+    
+    # Get messages for the last 4 days (top-level only)
+    # We want messages where day_id >= current_day_id - 3
+    from ..models import CommunityMessage, Day, Event
+    
+    start_day_id = max(1, day.id - 3)
+    messages = CommunityMessage.query.filter(
+        CommunityMessage.day_id >= start_day_id,
+        CommunityMessage.parent_id == None
+    ).order_by(CommunityMessage.created_at.desc()).all()
+    
+    # Check if we need to generate messages for TODAY
+    # We only generate if there are NO messages for the current day
+    today_messages = [m for m in messages if m.day_id == day.id]
+    
+    if not today_messages:
+        # Lazy generation for today
+        # User wants today's messages to be about YESTERDAY's vote/event
+        # So we need to find yesterday's day_id
+        yesterday_id = day.id - 1
+        yesterday_day = Day.query.get(yesterday_id) if yesterday_id > 0 else None
+        
+        # Default context
+        event_headline = None
+        chosen_option = None
+        category = "general"
+        
+        if yesterday_day:
+            # Get yesterday's event and chosen option
+            if yesterday_day.event:
+                event_headline = yesterday_day.event.headline
+                # We need to find the category from the template if possible, or just guess
+                # The Event model doesn't store category directly, but we can try to infer or just use general
+                # Ideally we should store category on Event, but for now let's default to general or try to match
+                pass
+            
+            chosen_option_key = yesterday_day.chosen_option
+            chosen_option = chosen_option_key
+            
+            # Try to find the label
+            if yesterday_day.event and yesterday_day.event.options:
+                for opt in yesterday_day.event.options:
+                    # Options can be dicts or objects depending on how they are loaded/stored
+                    if isinstance(opt, dict):
+                        if opt.get('key') == chosen_option_key:
+                            chosen_option = opt.get('label', chosen_option_key)
+                            break
+                    elif hasattr(opt, 'key') and opt.key == chosen_option_key:
+                        chosen_option = getattr(opt, 'label', chosen_option_key)
+                        break
+            
+        # Get current world state for stats
+        _, ws, ev = get_current()
+        
+        # Generate messages for TODAY (day.id) but using YESTERDAY's context
+        from ..utils.message_generator import generate_messages_for_day
+        
+        msgs_data = generate_messages_for_day(
+            day.id, 
+            category, 
+            ws, 
+            event_headline=event_headline,
+            chosen_option_label=chosen_option
+        )
+        
+        new_messages = []
+        for msg_data in msgs_data:
+            replies_data = msg_data.pop('replies', [])
+            msg = CommunityMessage(**msg_data)
+            db.session.add(msg)
+            db.session.flush()
+            new_messages.append(msg)
+            
+            for reply_data in replies_data:
+                reply_data['parent_id'] = msg.id
+                reply = CommunityMessage(**reply_data)
+                db.session.add(reply)
+                
+        db.session.commit()
+        
+        # Add new messages to the list
+        messages.extend(new_messages)
+        # Re-sort
+        messages.sort(key=lambda x: x.created_at, reverse=True)
+        
+    # Format response with replies
+    result = []
+    for m in messages:
+        msg_dict = {
+            'id': m.id,
+            'day_id': m.day_id, # Include day_id for frontend
+            'author': m.author_name,
+            'avatar': m.avatar_seed,
+            'content': m.content,
+            'sentiment': m.sentiment,
+            'created_at': m.created_at.isoformat(),
+            'replies': []
+        }
+        
+        # Fetch replies
+        for r in m.replies:
+            msg_dict['replies'].append({
+                'id': r.id,
+                'day_id': r.day_id,
+                'author': r.author_name,
+                'avatar': r.avatar_seed,
+                'content': r.content,
+                'sentiment': r.sentiment,
+                'created_at': r.created_at.isoformat()
+            })
+            
+        result.append(msg_dict)
+        
+    return jsonify(result)
 
 
 
