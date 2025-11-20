@@ -18,6 +18,13 @@
   .glass-effect-dark {
     @apply bg-black/20 backdrop-blur-xl border border-white/5;
   }
+
+  /* Improve select/option contrast inside glass-effect components */
+  .glass-effect-dark select,
+  .glass-effect-dark option {
+    color: rgba(255,255,255,0.95);
+    background: rgba(0,0,0,0.6);
+  }
   
   .shimmer {
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);

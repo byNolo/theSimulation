@@ -314,9 +314,11 @@ def api_history():
                 'last_event': ws.last_event if ws else "No data",
             },
             'event': {
-                'headline': ev.headline if ev else "No event",
-                'options': ev.options if ev else [],
-            },
+                    'headline': ev.headline if ev else "No event",
+                    'description': ev.description if ev else "",
+                    'category': None if not ev else (getattr(ev, 'category', None) or (find_event_template_by_options(ev.options).category if find_event_template_by_options(ev.options) else None)),
+                    'options': ev.options if ev else [],
+                },
             'tally': tally,
         })
     return jsonify(result)

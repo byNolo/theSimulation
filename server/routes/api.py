@@ -4,7 +4,7 @@ from datetime import datetime
 from ..db import db
 from ..models import Day, WorldState, Event, Vote, Telemetry, User
 from ..models_projects import Project, ActiveProject, CompletedProject, ProjectVote
-from ..events import choose_template
+from ..events import choose_template, find_template_by_options
 from sqlalchemy.exc import IntegrityError
 
 api_bp = Blueprint('api', __name__)
@@ -230,11 +230,21 @@ def api_me():
 @api_bp.route('/event')
 def api_event():
     day, _, ev = get_current()
+    # Try to infer category from the stored Event row; fallback to matching a template
+    category = None
+    if ev:
+        category = getattr(ev, 'category', None)
+        if not category:
+            tmpl = find_template_by_options(ev.options)
+            if tmpl:
+                category = tmpl.category
+
     return jsonify({
         'day': day.id,
         'headline': ev.headline,
         'description': ev.description,
         'options': ev.options,  # Now includes label and description
+        'category': category,
     })
 
 

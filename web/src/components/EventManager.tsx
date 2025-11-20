@@ -33,6 +33,55 @@ type EventData = {
   updated_at?: string
 }
 
+type CategorySummary = {
+  category: string
+  avgMorale: number
+  avgSupplies: number
+  avgThreat: number
+  eventCount: number
+}
+
+function computeEventBalance(
+  events: { builtin: EventData[]; custom: EventData[] } | null
+): CategorySummary[] {
+  if (!events) return []
+
+  const all = [...events.builtin, ...events.custom]
+  const byCat: Record<string, { m: number; s: number; t: number; count: number }> = {}
+
+  all.forEach(ev => {
+    if (!byCat[ev.category]) {
+      byCat[ev.category] = { m: 0, s: 0, t: 0, count: 0 }
+    }
+
+    // average deltas across options in this event
+    let mSum = 0
+    let sSum = 0
+    let tSum = 0
+    const k = ev.options.length || 1
+
+    ev.options.forEach(opt => {
+      mSum += opt.deltas.morale
+      sSum += opt.deltas.supplies
+      tSum += opt.deltas.threat
+    })
+
+    byCat[ev.category].m += mSum / k
+    byCat[ev.category].s += sSum / k
+    byCat[ev.category].t += tSum / k
+    byCat[ev.category].count += 1
+  })
+
+  return Object.entries(byCat).map(([category, v]) => ({
+    category,
+    avgMorale: v.m / v.count,
+    avgSupplies: v.s / v.count,
+    avgThreat: v.t / v.count,
+    eventCount: v.count,
+  }))
+}
+
+
 const EventManager: React.FC = () => {
   const [events, setEvents] = useState<{ builtin: EventData[], custom: EventData[], total: number } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -44,6 +93,8 @@ const EventManager: React.FC = () => {
   useEffect(() => {
     loadEvents()
   }, [])
+
+  const categorySummaries = computeEventBalance(events)
 
   const loadEvents = async () => {
     try {
@@ -110,6 +161,42 @@ const EventManager: React.FC = () => {
           + Create Event
         </button>
       </div>
+
+      {/* Category Balance Snapshot */}
+      {events && categorySummaries.length > 0 && (
+        <div className="glass-effect-dark rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-300 mb-3">
+            Category Balance Snapshot
+          </h3>
+          <div className="grid md:grid-cols-4 gap-3 text-xs">
+            {categorySummaries.map(cat => (
+              <div key={cat.category} className="bg-black/40 rounded-lg p-3">
+                <div className="font-semibold text-white mb-1 capitalize">
+                  {cat.category} <span className="text-gray-400">({cat.eventCount})</span>
+                </div>
+                <div className="flex justify-between text-gray-300">
+                  <span>M:</span>
+                  <span className={cat.avgMorale > 0 ? 'text-green-400' : cat.avgMorale < 0 ? 'text-red-400' : 'text-gray-300'}>
+                    {cat.avgMorale.toFixed(1)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-gray-300">
+                  <span>S:</span>
+                  <span className={cat.avgSupplies > 0 ? 'text-green-400' : cat.avgSupplies < 0 ? 'text-red-400' : 'text-gray-300'}>
+                    {cat.avgSupplies.toFixed(1)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-gray-300">
+                  <span>T:</span>
+                  <span className={cat.avgThreat > 0 ? 'text-red-400' : cat.avgThreat < 0 ? 'text-green-400' : 'text-gray-300'}>
+                    {cat.avgThreat.toFixed(1)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-2">
@@ -310,6 +397,36 @@ const EventForm: React.FC<{
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Client-side validation to avoid losing user input on simple mistakes
+    const validateForm = () => {
+      if (!formData.event_id || formData.event_id.trim() === '') return 'Event ID is required.'
+      if (!formData.headline || formData.headline.trim() === '') return 'Headline is required.'
+      if (!formData.description || formData.description.trim() === '') return 'Description is required.'
+      if (!Array.isArray(formData.options) || formData.options.length < 2) return 'At least 2 options are required.'
+
+      const seenKeys = new Set<string>()
+      for (let i = 0; i < formData.options.length; i++) {
+        const opt = formData.options[i]
+        if (!opt.key || String(opt.key).trim() === '') return `Option ${i + 1}: key is required.`
+        if (!opt.label || String(opt.label).trim() === '') return `Option ${i + 1}: label is required.`
+        if (seenKeys.has(opt.key)) return `Duplicate option key: "${opt.key}". Keys must be unique within this event.`
+        seenKeys.add(opt.key)
+
+        const d = opt.deltas || {}
+        if (d.morale === undefined || d.supplies === undefined || d.threat === undefined) return `Option ${i + 1}: deltas for morale, supplies, and threat are required.`
+        if (isNaN(Number(d.morale)) || isNaN(Number(d.supplies)) || isNaN(Number(d.threat))) return `Option ${i + 1}: deltas must be numbers.`
+      }
+
+      return null
+    }
+
+    const validationError = validateForm()
+    if (validationError) {
+      setMsg(validationError)
+      return
+    }
+
     setSubmitting(true)
     setMsg(null)
 
@@ -321,6 +438,7 @@ const EventForm: React.FC<{
       }
       onSuccess()
     } catch (e: any) {
+      // Keep form data intact; show server-side message if provided
       setMsg(e?.error || e?.message || String(e))
     } finally {
       setSubmitting(false)
@@ -328,8 +446,8 @@ const EventForm: React.FC<{
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-6 overflow-y-auto">
-      <div className="glass-effect rounded-2xl p-8 max-w-4xl w-full my-8">
+    <div className="fixed inset-0 bg-black/80 flex items-start md:items-center justify-center z-50 overflow-y-auto px-6">
+      <div className="glass-effect rounded-2xl p-8 max-w-4xl w-full m-6 max-h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar">
         <h2 className="text-2xl font-bold mb-6">{event ? 'Edit Event' : 'Create New Event'}</h2>
         
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -351,7 +469,7 @@ const EventForm: React.FC<{
               <select
                 value={formData.category}
                 onChange={e => setFormData({...formData, category: e.target.value})}
-                className="w-full px-4 py-2 glass-effect-dark rounded-lg"
+                className="w-full px-4 py-2 glass-effect-dark rounded-lg text-gray-100 bg-black/60 appearance-none pr-8"
               >
                 <option value="general">General</option>
                 <option value="crisis">Crisis</option>
@@ -481,85 +599,99 @@ const EventForm: React.FC<{
           {/* Options */}
           <div>
             <label className="block text-sm font-medium mb-2">Options * (at least 2)</label>
-            {formData.options.map((opt, idx) => (
+            {formData.options.map((opt, idx) => {
+              const score = opt.deltas.morale + opt.deltas.supplies - opt.deltas.threat
+
+              return (
               <div key={idx} className="glass-effect-dark rounded-lg p-4 mb-3">
                 <div className="grid md:grid-cols-2 gap-3 mb-3">
-                  <input
-                    type="text"
-                    value={opt.key}
-                    onChange={e => {
-                      const newOptions = [...formData.options]
-                      newOptions[idx].key = e.target.value
-                      setFormData({...formData, options: newOptions})
-                    }}
-                    placeholder="Option key (e.g., fortify)"
-                    className="px-3 py-2 bg-black/30 rounded"
-                    required
-                  />
-                  <input
-                    type="text"
-                    value={opt.label}
-                    onChange={e => {
-                      const newOptions = [...formData.options]
-                      newOptions[idx].label = e.target.value
-                      setFormData({...formData, options: newOptions})
-                    }}
-                    placeholder="Display label (e.g., Fortify Defenses)"
-                    className="px-3 py-2 bg-black/30 rounded"
-                    required
-                  />
-                </div>
                 <input
                   type="text"
-                  value={opt.description}
+                  value={opt.key}
                   onChange={e => {
-                    const newOptions = [...formData.options]
-                    newOptions[idx].description = e.target.value
-                    setFormData({...formData, options: newOptions})
+                  const newOptions = [...formData.options]
+                  newOptions[idx].key = e.target.value
+                  setFormData({...formData, options: newOptions})
                   }}
-                  placeholder="Description (optional)"
-                  className="w-full px-3 py-2 bg-black/30 rounded mb-3"
+                  placeholder="Option key (e.g., fortify)"
+                  className="px-3 py-2 bg-black/30 rounded"
+                  required
+                />
+                <input
+                  type="text"
+                  value={opt.label}
+                  onChange={e => {
+                  const newOptions = [...formData.options]
+                  newOptions[idx].label = e.target.value
+                  setFormData({...formData, options: newOptions})
+                  }}
+                  placeholder="Display label (e.g., Fortify Defenses)"
+                  className="px-3 py-2 bg-black/30 rounded"
+                  required
+                />
+                </div>
+                <input
+                type="text"
+                value={opt.description}
+                onChange={e => {
+                  const newOptions = [...formData.options]
+                  newOptions[idx].description = e.target.value
+                  setFormData({...formData, options: newOptions})
+                }}
+                placeholder="Description (optional)"
+                className="w-full px-3 py-2 bg-black/30 rounded mb-3"
                 />
                 <div className="grid grid-cols-3 gap-3">
-                  <input
-                    type="number"
-                    value={opt.deltas.morale}
-                    onChange={e => {
-                      const newOptions = [...formData.options]
-                      newOptions[idx].deltas.morale = parseInt(e.target.value)
-                      setFormData({...formData, options: newOptions})
-                    }}
-                    placeholder="Morale Δ"
-                    className="px-3 py-2 bg-black/30 rounded"
-                    required
-                  />
-                  <input
-                    type="number"
-                    value={opt.deltas.supplies}
-                    onChange={e => {
-                      const newOptions = [...formData.options]
-                      newOptions[idx].deltas.supplies = parseInt(e.target.value)
-                      setFormData({...formData, options: newOptions})
-                    }}
-                    placeholder="Supplies Δ"
-                    className="px-3 py-2 bg-black/30 rounded"
-                    required
-                  />
-                  <input
-                    type="number"
-                    value={opt.deltas.threat}
-                    onChange={e => {
-                      const newOptions = [...formData.options]
-                      newOptions[idx].deltas.threat = parseInt(e.target.value)
-                      setFormData({...formData, options: newOptions})
-                    }}
-                    placeholder="Threat Δ"
-                    className="px-3 py-2 bg-black/30 rounded"
-                    required
-                  />
+                <input
+                  type="number"
+                  value={opt.deltas.morale}
+                  onChange={e => {
+                  const newOptions = [...formData.options]
+                  newOptions[idx].deltas.morale = parseInt(e.target.value)
+                  setFormData({...formData, options: newOptions})
+                  }}
+                  placeholder="Morale Δ"
+                  className="px-3 py-2 bg-black/30 rounded"
+                  required
+                />
+                <input
+                  type="number"
+                  value={opt.deltas.supplies}
+                  onChange={e => {
+                  const newOptions = [...formData.options]
+                  newOptions[idx].deltas.supplies = parseInt(e.target.value)
+                  setFormData({...formData, options: newOptions})
+                  }}
+                  placeholder="Supplies Δ"
+                  className="px-3 py-2 bg-black/30 rounded"
+                  required
+                />
+                <input
+                  type="number"
+                  value={opt.deltas.threat}
+                  onChange={e => {
+                  const newOptions = [...formData.options]
+                  newOptions[idx].deltas.threat = parseInt(e.target.value)
+                  setFormData({...formData, options: newOptions})
+                  }}
+                  placeholder="Threat Δ"
+                  className="px-3 py-2 bg-black/30 rounded"
+                  required
+                />
+                </div>
+
+                <div className="mt-2 text-xs text-gray-400">
+                Option balance score:{' '}
+                <span className={score >= 0 ? 'text-green-400' : 'text-red-400'}>
+                  {score}
+                </span>
+                <span className="text-gray-500 ml-1">
+                  (morale + supplies − threat)
+                </span>
                 </div>
               </div>
-            ))}
+              )
+            })}
             <button
               type="button"
               onClick={() => setFormData({

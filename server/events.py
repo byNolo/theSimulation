@@ -712,6 +712,28 @@ def get_all_available_events():
     return builtin + custom
 
 
+def find_template_by_options(options):
+       """Find an EventTemplate that matches a stored event's options.
+
+       `options` may be a list of dicts with 'key' or a list of simple keys.
+       Returns an EventTemplate or None.
+       """
+       if not options:
+              return None
+
+       # Normalize keys from stored event
+       option_keys = set([opt['key'] if isinstance(opt, dict) else opt for opt in options])
+
+       # Search all available templates (builtin + custom)
+       all_events = get_all_available_events()
+       for template in all_events:
+              template_keys = set([opt.key for opt in template.options])
+              if template_keys == option_keys:
+                     return template
+
+       return None
+
+
 def is_event_available(event: EventTemplate, morale: int, supplies: int, threat: int, day_number: int) -> bool:
     """Check if an event meets the conditions to appear"""
     if day_number < event.requires_day:

@@ -3,6 +3,69 @@ import api from '../services/api'
 import EventManager from '../components/EventManager'
 import UserManager from '../components/UserManager'
 
+// ===== Balance helpers =====
+
+type DriftSummary = {
+  avgMorale: number
+  avgSupplies: number
+  avgThreat: number
+  days: number
+}
+
+function computeDrift(history: any[] | null): DriftSummary | null {
+  if (!history || history.length < 2) return null
+
+  let dm = 0
+  let ds = 0
+  let dt = 0
+
+  for (let i = 1; i < history.length; i++) {
+    const prev = history[i - 1].world
+    const curr = history[i].world
+    dm += curr.morale - prev.morale
+    ds += curr.supplies - prev.supplies
+    dt += curr.threat - prev.threat
+  }
+
+  const days = history.length - 1
+
+  return {
+    avgMorale: dm / days,
+    avgSupplies: ds / days,
+    avgThreat: dt / days,
+    days,
+  }
+}
+
+function driftLabel(value: number) {
+  if (value > 1) return { label: 'Rising', className: 'text-green-400' }
+  if (value < -1) return { label: 'Falling', className: 'text-red-400' }
+  return { label: 'Stable', className: 'text-gray-300' }
+}
+
+type EventMix = {
+  total: number
+  byCategory: Record<string, number>
+}
+
+function computeEventMix(history: any[] | null, limit: number = 30): EventMix | null {
+  if (!history || history.length === 0) return null
+
+  const slice = history.slice(-limit) // last N days
+  const byCategory: Record<string, number> = {}
+  let total = 0
+
+  slice.forEach(day => {
+    const cat = day.event?.category || 'unknown'
+    byCategory[cat] = (byCategory[cat] || 0) + 1
+    total++
+  })
+
+  if (total === 0) return null
+  return { total, byCategory }
+}
+
+
 const AdminPage: React.FC = () => {
   const [me, setMe] = useState<any>(null)
   const [metrics, setMetrics] = useState<any | null>(null)
@@ -11,6 +74,10 @@ const AdminPage: React.FC = () => {
   const [msg, setMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'users'>('overview')
+
+  const drift = computeDrift(history)
+
+  const eventMix = computeEventMix(history, 30) // last 30 days
 
   useEffect(() => {
     checkAuth()
@@ -198,6 +265,166 @@ const AdminPage: React.FC = () => {
 
         {activeTab === 'overview' && (
           <>
+            {/* Balance Snapshot */}
+            {history && (
+              <section className="glass-effect rounded-2xl p-6">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                  <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 3v18h18M7 13l3 3 7-7"
+                    />
+                  </svg>
+                  <span>Balance Snapshot {drift?.days ? `(last ${drift.days} days)` : ''}</span>
+                </h3>
+
+                {drift ? (
+                  <>
+                    <div className="grid md:grid-cols-3 gap-4 mb-4">
+                      {/* Morale */}
+                      <div className="glass-effect-dark rounded-xl p-4">
+                        <div className="text-xs text-gray-400 uppercase mb-1">Morale Drift</div>
+                        <div className="text-2xl font-bold text-white">
+                          {drift.avgMorale.toFixed(1)}
+                          <span className="text-sm text-gray-400 ml-1">/ day</span>
+                        </div>
+                        {(() => {
+                          const { label, className } = driftLabel(drift.avgMorale)
+                          return <div className={`text-xs mt-1 ${className}`}>{label}</div>
+                        })()}
+                      </div>
+
+                      {/* Supplies */}
+                      <div className="glass-effect-dark rounded-xl p-4">
+                        <div className="text-xs text-gray-400 uppercase mb-1">Supplies Drift</div>
+                        <div className="text-2xl font-bold text-white">
+                          {drift.avgSupplies.toFixed(1)}
+                          <span className="text-sm text-gray-400 ml-1">/ day</span>
+                        </div>
+                        {(() => {
+                          const { label, className } = driftLabel(drift.avgSupplies)
+                          return <div className={`text-xs mt-1 ${className}`}>{label}</div>
+                        })()}
+                      </div>
+
+                      {/* Threat */}
+                      <div className="glass-effect-dark rounded-xl p-4">
+                        <div className="text-xs text-gray-400 uppercase mb-1">Threat Drift</div>
+                        <div className="text-2xl font-bold text-white">
+                          {drift.avgThreat.toFixed(1)}
+                          <span className="text-sm text-gray-400 ml-1">/ day</span>
+                        </div>
+                        {(() => {
+                          const { label, className } = driftLabel(drift.avgThreat)
+                          return <div className={`text-xs mt-1 ${className}`}>{label}</div>
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Simple heuristics / alerts */}
+                    <div className="text-sm text-gray-300">
+                      {drift.avgMorale > 3 && drift.avgSupplies > 3 && drift.avgThreat < -1 && (
+                        <div className="text-green-300">
+                          ✅ Game looks very forgiving right now (might be too easy).
+                        </div>
+                      )}
+                      {drift.avgSupplies < -5 && (
+                        <div className="text-red-300">
+                          ⚠️ Supplies are draining quickly on average. Consider buffing supply events or projects.
+                        </div>
+                      )}
+                      {drift.avgThreat > 2 && (
+                        <div className="text-red-300">
+                          🔥 Threat is climbing fast. Players may feel constantly under siege.
+                        </div>
+                      )}
+                      {Math.abs(drift.avgMorale) <= 1 && Math.abs(drift.avgSupplies) <= 1 && Math.abs(drift.avgThreat) <= 1 && (
+                        <div className="text-gray-300">
+                          ℹ️ Stats are roughly stable. Difficulty may depend mostly on specific events.
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-400">Not enough history yet to compute drift.</p>
+                )}
+              </section>
+            )}
+
+            {/* Event Mix (last 30 days) */}
+            {eventMix && (
+              <section className="glass-effect rounded-2xl p-6">
+                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  <svg className="w-6 h-6 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M11 3.055A9 9 0 1020.945 13H11V3.055z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.536 8.464A5 5 0 0111 13"
+                    />
+                  </svg>
+                  <span>Event Mix (last {eventMix.total} days)</span>
+                </h3>
+
+                <div className="grid md:grid-cols-4 gap-3 text-sm">
+                  {Object.entries(eventMix.byCategory).map(([cat, count]) => {
+                    const pct = (count / eventMix.total) * 100
+                    const niceCat = cat === 'unknown' ? 'No event / unknown' : cat
+
+                    // Basic expected ranges you can tweak:
+                    // - general: often
+                    // - opportunity: rare-ish (10–25%)
+                    // - crisis: low but nonzero (5–15%)
+                    // - narrative: whatever you want for story flavor
+                    let hint: string | null = null
+                    if (cat === 'crisis' && pct < 3) {
+                      hint = 'Crises almost never trigger; difficulty may feel too gentle.'
+                    } else if (cat === 'crisis' && pct > 20) {
+                      hint = 'Crises are very common; this may feel punishing.'
+                    } else if (cat === 'opportunity' && pct > 30) {
+                      hint = 'Opportunities are very frequent; game may be too generous.'
+                    }
+
+                    return (
+                      <div key={cat} className="bg-black/40 rounded-lg p-3">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-semibold text-white capitalize">
+                            {niceCat}
+                          </span>
+                          <span className="text-gray-400">
+                            {pct.toFixed(0)}%
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden mb-1">
+                          <div
+                            className="h-full bg-sky-400"
+                            style={{ width: `${Math.min(100, pct)}%` }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {count} event{count !== 1 ? 's' : ''}
+                        </div>
+                        {hint && (
+                          <div className="text-[11px] text-amber-300 mt-1">
+                            {hint}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
+
             {/* Metrics */}
             {metrics && (
               <section className="glass-effect rounded-2xl p-6">
