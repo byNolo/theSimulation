@@ -6,6 +6,7 @@ from ..models import Day, WorldState, Event, Vote, Telemetry, User
 from ..models_projects import Project, ActiveProject, CompletedProject, ProjectVote
 from ..events import choose_template, find_template_by_options
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_
 
 api_bp = Blueprint('api', __name__)
 
@@ -321,10 +322,47 @@ def api_my_vote():
 @api_bp.route('/history')
 def api_history():
     """Get history of past events and outcomes"""
-    # Get all days that have been finalized (chosen_option is not null)
-    days = Day.query.filter(Day.chosen_option.isnot(None)).order_by(Day.id.desc()).limit(30).all()
-    
-    history = []
+    # Pagination & search parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 30, type=int)
+    search = request.args.get('search', None, type=str)
+
+    # Base query: only finalized days
+    query = Day.query.filter(Day.chosen_option.isnot(None)).order_by(Day.id.desc())
+
+    # If search provided, join Event and filter headline/description/chosen_option/day number/date
+    if search:
+        try:
+            # numeric day search (e.g., 42)
+            day_num = int(search)
+        except Exception:
+            day_num = None
+
+        # try parsing common date formats
+        parsed_date = None
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
+            try:
+                parsed_date = datetime.strptime(search, fmt).date()
+                break
+            except Exception:
+                parsed_date = None
+
+        # Build OR filters
+        filters = []
+        filters.append(Event.headline.ilike(f"%{search}%"))
+        filters.append(Event.description.ilike(f"%{search}%"))
+        filters.append(Day.chosen_option.ilike(f"%{search}%"))
+        if day_num is not None:
+            filters.append(Day.id == day_num)
+        if parsed_date is not None:
+            filters.append(Day.est_date == parsed_date)
+
+        query = query.join(Event).filter(or_(*filters))
+
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    days = pagination.items
+
+    history: list = []
     for day in days:
         ws = WorldState.query.filter_by(day_id=day.id).first()
         ev = Event.query.filter_by(day_id=day.id).first()
@@ -361,8 +399,14 @@ def api_history():
                 'last_event': ws.last_event
             }
         })
-    
-    return jsonify(history)
+
+    return jsonify({
+        'history': history,
+        'total': pagination.total,
+        'page': pagination.page,
+        'per_page': pagination.per_page,
+        'pages': pagination.pages
+    })
 
 
 @api_bp.route('/messages')

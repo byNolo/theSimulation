@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import useFetch from '../hooks/useFetch'
 import { default as api } from '../services/api'
 import StatBar from '../components/StatBar'
@@ -21,6 +21,11 @@ const Home: React.FC = () => {
   const [me, setMe] = useState<any>(null)
   const [currentVote, setCurrentVote] = useState<string | null>(null)
   const [history, setHistory] = useState<any[]>([])
+  const [historyPage, setHistoryPage] = useState<number>(1)
+  const [historyPages, setHistoryPages] = useState<number>(1)
+  const [historyTotal, setHistoryTotal] = useState<number>(0)
+  const [historyPerPage] = useState<number>(6)
+  const [historySearch, setHistorySearch] = useState<string>('')
   const [messages, setMessages] = useState<any[]>([])
   const [projectsData, setProjectsData] = useState<any>(null)
 
@@ -54,18 +59,20 @@ const Home: React.FC = () => {
     }
   }, [me])
 
-  // Fetch event history
+  // Fetch event history with pagination/search
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const data = await api.getHistory()
-        setHistory(data)
+        const data = await api.getHistoryPage(historyPage, historyPerPage, historySearch || undefined)
+        setHistory(data.history || [])
+        setHistoryPages(data.pages || 1)
+        setHistoryTotal(data.total || 0)
       } catch (e) {
         console.error('Failed to fetch history:', e)
       }
     }
     fetchHistory()
-  }, [])
+  }, [historyPage, historyPerPage, historySearch])
 
   // Fetch community messages
   useEffect(() => {
@@ -197,6 +204,8 @@ const Home: React.FC = () => {
 
   const bgEffects = getBackgroundEffects()
 
+  const handleHistorySearch = useCallback((s: string) => { setHistorySearch(s); setHistoryPage(1) }, [])
+
   return (
     <div className="min-h-screen p-6 max-w-6xl mx-auto relative">
       {/* Welcome Modal for first-time users */}
@@ -260,7 +269,16 @@ const Home: React.FC = () => {
         {/* Event history */}
         <div className="grid md:grid-cols-3 gap-6">
           <div className="md:col-span-2">
-            <EventHistory history={history} />
+            <EventHistory
+              history={history}
+              page={historyPage}
+              pages={historyPages}
+              total={historyTotal}
+              perPage={historyPerPage}
+              search={historySearch}
+              onPageChange={(p) => setHistoryPage(p)}
+              onSearch={handleHistorySearch}
+            />
           </div>
           <div className="md:col-span-1">
             <CommunityBoard messages={messages} />
@@ -285,7 +303,7 @@ const Home: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <span className="px-3 py-1 glass-effect-dark rounded-full">Beta v0.2.0</span>
+              <span className="px-3 py-1 glass-effect-dark rounded-full">Beta v0.2.2</span>
               {me?.authenticated && me?.user?.is_admin && (
                 <a href="/admin" className="px-3 py-1 glass-effect-dark rounded-full hover:bg-white/10 transition-colors">
                   Admin

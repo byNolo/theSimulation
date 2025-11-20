@@ -35,7 +35,16 @@ export async function getMyVote() {
 }
 
 export async function getHistory() {
+  // Default public history fetch (first page)
   return fetchJson('/api/history', { credentials: 'include' })
+}
+
+export async function getHistoryPage(page = 1, perPage = 30, search?: string) {
+  const qs = new URLSearchParams()
+  qs.set('page', String(page))
+  qs.set('per_page', String(perPage))
+  if (search) qs.set('search', search)
+  return fetchJson(`/api/history?${qs.toString()}`, { credentials: 'include' })
 }
 
 export async function getCommunityMessages() {
@@ -150,5 +159,5 @@ export default {
   getMetrics, getAdminHistory, getTelemetry, adminTick,
   listEvents, createEvent, updateEvent, deleteEvent, toggleEvent,
   listUsers, getUser, toggleUserAdmin, deleteUser, getUserStats,
-  getCommunityMessages, getProjects, voteProject
+  getCommunityMessages, getProjects, voteProject, getHistoryPage
 }

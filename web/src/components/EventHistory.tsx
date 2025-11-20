@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 
 type HistoryEntry = {
   day: number
@@ -18,19 +18,34 @@ type HistoryEntry = {
   }
 }
 
-const EventHistory: React.FC<{ history: HistoryEntry[] }> = ({ history }) => {
+const EventHistory: React.FC<{
+  history: HistoryEntry[]
+  page?: number
+  pages?: number
+  total?: number
+  perPage?: number
+  search?: string
+  onPageChange?: (p: number) => void
+  onSearch?: (term: string) => void
+}> = ({ history, page = 1, pages = 1, total = 0, perPage = 30, search = '', onPageChange, onSearch }) => {
   const [expandedDay, setExpandedDay] = useState<number | null>(null)
+  const [localSearch, setLocalSearch] = useState(search)
+  useEffect(() => {
+    setLocalSearch(search)
+  }, [search])
 
-  if (!history || history.length === 0) {
-    return (
-      <section className="glass-effect rounded-2xl p-8">
-        <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-          Event History
-        </h2>
-        <p className="text-gray-400">No past events yet. Check back after the first day concludes!</p>
-      </section>
-    )
-  }
+  // Debounce live search: call onSearch 400ms after typing stops
+  useEffect(() => {
+    if (!onSearch) return
+    const t = setTimeout(() => {
+      // Only trigger if value actually changed
+      onSearch(localSearch.trim())
+    }, 400)
+    return () => clearTimeout(t)
+  }, [localSearch, onSearch])
+
+  // Always render the header/search area — if there are no results
+  // we'll show a friendly message in the list area below instead
 
   return (
     <section className="glass-effect rounded-2xl p-8 space-y-6">
@@ -38,16 +53,37 @@ const EventHistory: React.FC<{ history: HistoryEntry[] }> = ({ history }) => {
         <h2 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
           Event History
         </h2>
-        <div className="flex items-center gap-2 text-sm text-gray-400">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>{history.length} past {history.length === 1 ? 'event' : 'events'}</span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{total} past {total === 1 ? 'event' : 'events'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Search history..."
+              value={localSearch}
+              onChange={e => setLocalSearch(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && onSearch) onSearch(localSearch.trim())
+              }}
+              className="px-3 py-2 glass-effect-dark rounded-lg text-sm w-48"
+            />
+            <button
+              onClick={() => onSearch && onSearch(localSearch.trim())}
+              className="px-3 py-2 glass-effect-dark rounded-lg text-sm"
+            >Search</button>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-3">
-        {history.map((entry) => {
+      {(!history || history.length === 0) ? (
+        <div className="p-6 text-gray-400">No past events match your search.</div>
+      ) : (
+        <div className="space-y-3">
+          {history.map((entry) => {
           const isExpanded = expandedDay === entry.day
           const totalVotes = Object.values(entry.tally).reduce((sum, val) => sum + val, 0)
           const chosenVotes = entry.tally[entry.chosen_option] || 0
@@ -187,8 +223,25 @@ const EventHistory: React.FC<{ history: HistoryEntry[] }> = ({ history }) => {
               )}
             </div>
           )
-        })}
-      </div>
+          })}
+        </div>
+      )}
+      {/* Pagination */}
+      {pages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            onClick={() => onPageChange && onPageChange(Math.max(1, page - 1))}
+            disabled={page <= 1}
+            className="px-3 py-1 glass-effect-dark rounded"
+          >Prev</button>
+          <div className="text-sm text-gray-400">Page {page} / {pages}</div>
+          <button
+            onClick={() => onPageChange && onPageChange(Math.min(pages, page + 1))}
+            disabled={page >= pages}
+            className="px-3 py-1 glass-effect-dark rounded"
+          >Next</button>
+        </div>
+      )}
     </section>
   )
 }
