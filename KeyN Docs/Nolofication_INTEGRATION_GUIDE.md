@@ -262,7 +262,7 @@ class NoloficationService:
         metadata: Optional[dict] = None
     ) -> dict:
         """Send notification to multiple users."""
-        url = f"{self.base_url}/api/sites/{self.site_id}/notify/bulk"
+        url = f"{self.base_url}/api/sites/{self.site_id}/notify"
         
         payload = {
             'user_ids': user_ids,
@@ -361,7 +361,7 @@ class NoloficationService {
         htmlMessage = null, 
         metadata = null 
     }) {
-        const url = `${this.baseUrl}/api/sites/${this.siteId}/notify/bulk`;
+        const url = `${this.baseUrl}/api/sites/${this.siteId}/notify`;
         
         const payload = {
             user_ids: userIds,
@@ -585,7 +585,7 @@ curl -X POST https://nolofication.bynolo.ca/api/sites/your-site-id/notify \
 ### 5.2 Test Bulk Notification
 
 ```bash
-curl -X POST https://nolofication.bynolo.ca/api/sites/your-site-id/notify/bulk \
+curl -X POST https://nolofication.bynolo.ca/api/sites/your-site-id/notify \
   -H "X-API-Key: your-api-key" \
   -H "Content-Type: application/json" \
   -d '{

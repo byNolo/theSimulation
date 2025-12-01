@@ -152,6 +152,11 @@ def ensure_today():
         # Yesterday ended but wasn't ticked - auto-finalize it
         finalize_day(yesterday)
     
+    # Check again if today was created during finalization (race condition)
+    day = Day.query.filter_by(est_date=today).first()
+    if day:
+        return day
+    
     # Get last state and count total days
     last_state = WorldState.query.order_by(WorldState.id.desc()).first()
     day_count = Day.query.count()
@@ -167,46 +172,59 @@ def ensure_today():
     template = choose_template(morale, supplies, threat, day_count + 1)
     day = Day(est_date=today)
     db.session.add(day)
-    db.session.flush()
     
-    # Store option labels for display
-    option_data = [{"key": o.key, "label": o.label, "description": o.description} for o in template.options]
-    
-    ws = WorldState(day_id=day.id, morale=morale, supplies=supplies, threat=threat, last_event=last_event)
-    ev = Event(day_id=day.id, headline=template.headline, description=template.description, options=option_data)
-    db.session.add_all([ws, ev])
-    
-    # Generate community messages
-    from ..utils.message_generator import generate_messages_for_day
-    from ..models import CommunityMessage
-    
-    # Get context for messages
-    # For a new day, we might not have a chosen option yet (it's the start of the day)
-    # But we have the event headline
-    msgs_data = generate_messages_for_day(day.id, template.category, ws, event_headline=template.headline)
-    
-    for msg_data in msgs_data:
-        replies_data = msg_data.pop('replies', [])
-        msg = CommunityMessage(**msg_data)
-        db.session.add(msg)
-        db.session.flush() # Flush to get ID
-        
-        for reply_data in replies_data:
-            reply_data['parent_id'] = msg.id
-            reply = CommunityMessage(**reply_data)
-            db.session.add(reply)
-        
-    db.session.commit()
-    
-    # Send vote reminder for the new day
-    # Nolofication will handle scheduling based on user preferences
-    from ..scripts.send_day_notifications import send_vote_reminder_for_new_day
+    # Wrap entire day creation in try/except to handle race conditions
     try:
-        send_vote_reminder_for_new_day(day.id)
-    except Exception as e:
-        # Don't fail the day creation if notifications fail
-        import logging
-        logging.getLogger(__name__).error(f"Failed to send vote reminders: {e}")
+        db.session.flush()
+        
+        # Store option labels for display
+        option_data = [{"key": o.key, "label": o.label, "description": o.description} for o in template.options]
+        
+        ws = WorldState(day_id=day.id, morale=morale, supplies=supplies, threat=threat, last_event=last_event)
+        ev = Event(day_id=day.id, headline=template.headline, description=template.description, options=option_data)
+        db.session.add_all([ws, ev])
+        
+        # Generate community messages
+        from ..utils.message_generator import generate_messages_for_day
+        from ..models import CommunityMessage
+        
+        # Get context for messages
+        # For a new day, we might not have a chosen option yet (it's the start of the day)
+        # But we have the event headline
+        msgs_data = generate_messages_for_day(day.id, template.category, ws, event_headline=template.headline)
+        
+        for msg_data in msgs_data:
+            replies_data = msg_data.pop('replies', [])
+            msg = CommunityMessage(**msg_data)
+            db.session.add(msg)
+            db.session.flush() # Flush to get ID
+            
+            for reply_data in replies_data:
+                reply_data['parent_id'] = msg.id
+                reply = CommunityMessage(**reply_data)
+                db.session.add(reply)
+            
+        db.session.commit()
+        
+        # Send vote reminder for the new day
+        # Nolofication will handle scheduling based on user preferences
+        from ..scripts.send_day_notifications import send_vote_reminder_for_new_day
+        try:
+            send_vote_reminder_for_new_day(day.id)
+        except Exception as e:
+            # Don't fail the day creation if notifications fail
+            logger.error(f"Failed to send vote reminders: {e}")
+    
+    except IntegrityError as e:
+        # Another process created this day, fetch it and return
+        logger.warning(f"Race condition creating day {today}: {e}")
+        db.session.rollback()
+        day = Day.query.filter_by(est_date=today).first()
+        if not day:
+            # Still couldn't find it, something is wrong
+            logger.error(f"Failed to create or fetch day {today}")
+            raise
+        logger.info(f"Fetched existing day {today} created by another process")
     
     return day
 

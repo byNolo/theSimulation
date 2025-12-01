@@ -115,7 +115,8 @@ class NoloficationService:
         if not user_ids:
             return {'success': True, 'sent': 0}
         
-        url = f"{self.base_url}/api/sites/{self.site_id}/notify/bulk"
+        # Same endpoint as single notification, but with user_ids array instead of user_id string
+        url = f"{self.base_url}/api/sites/{self.site_id}/notify"
         
         payload = {
             'user_ids': user_ids,

@@ -129,10 +129,12 @@ def send_day_result_notifications(day_id: int, chosen_option_label: str, new_sta
         }
     )
     
-    if result.get('success'):
-        logger.info(f"Sent day {day_id} results to {len(keyn_user_ids)} users via Nolofication")
+    # Check if notifications were sent/scheduled successfully
+    if result.get('scheduled', 0) > 0 or result.get('successful', 0) > 0:
+        total_sent = result.get('scheduled', 0) + result.get('successful', 0)
+        logger.info(f"Sent day {day_id} results - {total_sent} scheduled/sent, {result.get('failed', 0)} failed")
     else:
-        logger.error(f"Failed to send day results: {result.get('error')}")
+        logger.error(f"Failed to send day results: {result}")
     
     return result
 
@@ -225,10 +227,12 @@ def send_vote_reminder_for_new_day(new_day_id: int):
         }
     )
     
-    if result.get('success'):
-        logger.info(f"Sent vote reminders for day {new_day_id} to {len(keyn_user_ids)} users")
+    # Check if notifications were sent/scheduled successfully
+    if result.get('scheduled', 0) > 0 or result.get('successful', 0) > 0:
+        total_sent = result.get('scheduled', 0) + result.get('successful', 0)
+        logger.info(f"Sent vote reminders for day {new_day_id} - {total_sent} scheduled/sent, {result.get('failed', 0)} failed")
     else:
-        logger.error(f"Failed to send vote reminders: {result.get('error')}")
+        logger.error(f"Failed to send vote reminders: {result}")
     
     return result
 
