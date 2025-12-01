@@ -125,6 +125,37 @@ const AdminPage: React.FC = () => {
     }
   }
 
+  const handleTestNotification = async () => {
+    try {
+      const res = await api.testNotification()
+      if (res.ok) {
+        setMsg(`✅ Test notifications sent! Check your Nolofication dashboard and configured channels. Sent to: ${res.user}`)
+      } else {
+        setMsg(`⚠️ ${res.message || 'Failed to send test notifications'}. Results: ${JSON.stringify(res.results)}`)
+      }
+    } catch (e: any) {
+      setMsg(`❌ Error: ${e?.error || e?.message || String(e)}`)
+    }
+  }
+
+  const handleCancelTestReminders = async () => {
+    try {
+      const res = await api.cancelTestReminders()
+      if (res.ok) {
+        if (res.cancelled === 0) {
+          setMsg(`ℹ️ ${res.message}. No pending vote reminders found for ${res.user}.`)
+        } else {
+          const details = res.pending.map((p: any) => `• ${p.title} (scheduled for ${new Date(p.scheduled_for).toLocaleString()})`).join('\n')
+          setMsg(`✅ Cancelled ${res.cancelled} pending vote reminder(s) for ${res.user}:\n${details}`)
+        }
+      } else {
+        setMsg(`⚠️ ${res.message || 'Failed to cancel test reminders'}`)
+      }
+    } catch (e: any) {
+      setMsg(`❌ Error: ${e?.error || e?.message || String(e)}`)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen p-6 flex items-center justify-center">
@@ -245,6 +276,20 @@ const AdminPage: React.FC = () => {
                 className="px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg glow-red"
               >
                 ⚡ Tick Day
+              </button>
+              <button
+                onClick={handleTestNotification}
+                className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg"
+                title="Send test notifications to yourself for both categories (day_results and vote_reminders)"
+              >
+                🧪 Test Notifications
+              </button>
+              <button
+                onClick={handleCancelTestReminders}
+                className="px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg"
+                title="Cancel any pending vote reminder notifications for yourself (tests the cancel feature)"
+              >
+                🚫 Cancel Test Reminders
               </button>
             </div>
           )}

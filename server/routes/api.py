@@ -7,6 +7,9 @@ from ..models_projects import Project, ActiveProject, CompletedProject, ProjectV
 from ..events import choose_template, find_template_by_options
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
+import logging
+
+logger = logging.getLogger(__name__)
 
 api_bp = Blueprint('api', __name__)
 
@@ -121,6 +124,20 @@ def finalize_day(day):
             db.session.add(reply)
 
     db.session.commit()
+    
+    # Send notifications about the day results
+    # Nolofication will handle scheduling based on user preferences
+    from ..scripts.send_day_notifications import send_day_result_notifications
+    try:
+        send_day_result_notifications(
+            day.id,
+            option_label,
+            {'morale': new_morale, 'supplies': new_supplies, 'threat': new_threat}
+        )
+    except Exception as e:
+        # Don't fail the day finalization if notifications fail
+        import logging
+        logging.getLogger(__name__).error(f"Failed to send day result notifications: {e}")
 
 
 def ensure_today():
@@ -180,6 +197,17 @@ def ensure_today():
             db.session.add(reply)
         
     db.session.commit()
+    
+    # Send vote reminder for the new day
+    # Nolofication will handle scheduling based on user preferences
+    from ..scripts.send_day_notifications import send_vote_reminder_for_new_day
+    try:
+        send_vote_reminder_for_new_day(day.id)
+    except Exception as e:
+        # Don't fail the day creation if notifications fail
+        import logging
+        logging.getLogger(__name__).error(f"Failed to send vote reminders: {e}")
+    
     return day
 
 
@@ -298,6 +326,32 @@ def api_vote():
     except IntegrityError:
         db.session.rollback()
         return jsonify({'error': 'Already voted today'}), 409
+    
+    # Cancel any pending vote reminder notifications for this user
+    # Since they've now voted, they don't need to be reminded
+    try:
+        from ..utils.nolofication import nolofication
+        user = User.query.get(user_id)
+        
+        if user and user.provider_user_id and nolofication.is_configured():
+            # Get pending vote_reminders for this user
+            pending = nolofication.get_pending_notifications(
+                user_id=user.provider_user_id,
+                category='vote_reminders'
+            )
+            
+            # Cancel all pending vote reminders
+            cancelled_count = 0
+            for notif in pending.get('pending_notifications', []):
+                result = nolofication.cancel_pending_notification(notif['id'])
+                if result.get('message'):
+                    cancelled_count += 1
+            
+            if cancelled_count > 0:
+                logger.info(f"Cancelled {cancelled_count} pending vote reminder(s) for user {user.display_name}")
+    except Exception as e:
+        # Don't fail the vote if notification cancellation fails
+        logger.error(f"Failed to cancel pending notifications: {e}")
     
     tally = tally_for_day(day.id)
     return jsonify({'ok': True, 'choice': choice, 'tally': tally})

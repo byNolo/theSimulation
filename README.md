@@ -76,7 +76,13 @@ cp .env.example .env
 Edit `.env` and set:
 - `KEYN_CLIENT_ID` and `KEYN_CLIENT_SECRET` (register at https://auth-keyn.bynolo.ca)
 - `SECRET_KEY` (generate with `python -c "import secrets; print(secrets.token_hex(32))"`)
+- **Nolofication Integration (Optional)**:
+  - `NOLOFICATION_URL` - URL of Nolofication service (default: https://nolofication.bynolo.ca)
+  - `NOLOFICATION_SITE_ID` - Your site ID in Nolofication (default: thesimulation)
+  - `NOLOFICATION_API_KEY` - API key from Nolofication registration (required for notifications)
 - Adjust ports if needed
+
+**Note**: If you don't configure Nolofication, the app will work normally but won't send vote reminder notifications.
 
 ### 3. Backend Setup
 
@@ -208,6 +214,58 @@ What it does:
 
 Notes:
 - This script is intended for simple/staging use. For production-grade deployments use a process manager (systemd, supervisor, or containers) and a reverse proxy (nginx) with TLS terminated externally.
+
+## 🔔 Notifications
+
+The Simulation integrates with [Nolofication](https://nolofication.bynolo.ca) v2 to send automated notifications with user-controlled scheduling.
+
+### Notification Categories
+
+The Simulation uses two notification categories:
+
+1. **Day Results** (`day_results`): Sent when a day finalizes with the community's decision and updated stats
+2. **Vote Reminders** (`vote_reminders`): Sent when a new day begins to remind users to vote
+
+Users can configure when they receive each category:
+- **Instant**: Receive immediately (default for important updates)
+- **Daily Digest**: Batch notifications sent once per day at preferred time
+- **Weekly Summary**: Batch notifications sent once per week
+
+### How It Works
+
+1. **Day Tick**: When a day ends (automatically at midnight EST), the system:
+   - Finalizes the previous day's results
+   - Sends **Day Results** notifications to all users
+   - Creates the new day
+   - Sends **Vote Reminders** to all users
+
+2. **Scheduling**: Nolofication handles delivery timing based on each user's preferences
+   - Users control their schedule at [Nolofication Dashboard](https://nolofication.bynolo.ca)
+   - Can choose different schedules for different categories
+   - Can disable categories they don't want
+
+3. **Multi-Channel**: Users receive notifications via their preferred channels:
+   - Email (with rich HTML formatting)
+   - Web push notifications
+   - Discord (if configured)
+   - Webhooks (if configured)
+
+### Setup
+
+To enable notifications:
+
+1. Register your site at Nolofication (contact admin or use CLI)
+2. Add environment variables to `.env`:
+   ```
+   NOLOFICATION_URL=https://nolofication.bynolo.ca
+   NOLOFICATION_SITE_ID=thesimulation
+   NOLOFICATION_API_KEY=your-api-key-here
+   ```
+3. Restart the server
+
+Notifications are sent automatically when day transitions occur. No scheduler needed!
+
+For more details on Nolofication integration, see [Nolofication_INTEGRATION_GUIDE.md](Nolofication_INTEGRATION_GUIDE.md).
 
 ## 🚀 Production Deployment
 

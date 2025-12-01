@@ -84,6 +84,20 @@ export async function adminTick() {
   })
 }
 
+export async function testNotification() {
+  return fetchJson('/api/admin/test-notification', {
+    method: 'POST',
+    credentials: 'include'
+  })
+}
+
+export async function cancelTestReminders() {
+  return fetchJson('/api/admin/cancel-test-reminders', {
+    method: 'POST',
+    credentials: 'include'
+  })
+}
+
 // Event management endpoints
 export async function listEvents() {
   return fetchJson('/api/admin/events', { credentials: 'include' })
@@ -156,7 +170,7 @@ export async function getUserStats() {
 
 export default {
   getMe, getState, getEvent, vote, getTally, getMyVote, getHistory,
-  getMetrics, getAdminHistory, getTelemetry, adminTick,
+  getMetrics, getAdminHistory, getTelemetry, adminTick, testNotification, cancelTestReminders,
   listEvents, createEvent, updateEvent, deleteEvent, toggleEvent,
   listUsers, getUser, toggleUserAdmin, deleteUser, getUserStats,
   getCommunityMessages, getProjects, voteProject, getHistoryPage

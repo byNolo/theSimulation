@@ -189,6 +189,160 @@ def api_tick():
     
     return jsonify(response)
 
+
+@admin_bp.route('/test-notification', methods=['POST'])
+@require_admin
+def test_notification():
+    """Send test notifications to the current admin user"""
+    from ..utils.nolofication import nolofication
+    
+    # Get current user
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    user = User.query.get(user_id)
+    if not user or not user.provider_user_id:
+        return jsonify({'error': 'User not found or not linked to KeyN'}), 400
+    
+    # Check if Nolofication is configured
+    if not nolofication.is_configured():
+        return jsonify({
+            'error': 'Nolofication not configured',
+            'message': 'Please set NOLOFICATION_API_KEY in your .env file'
+        }), 400
+    
+    # Send test notifications for both categories
+    results = {}
+    
+    # Test notification 1: Day Results category
+    result1 = nolofication.send_notification(
+        user_id=user.provider_user_id,
+        title="🧪 Test: Day Results Notification",
+        message="This is a test of the day_results notification category. You should receive this based on your day_results schedule preference.",
+        notification_type='info',
+        category='day_results',
+        html_message="""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #667eea;">🧪 Test: Day Results</h2>
+            <p>This is a <strong>test notification</strong> for the <code>day_results</code> category.</p>
+            <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                <p style="margin: 0;">✅ If you're seeing this, Nolofication integration is working!</p>
+            </div>
+            <p style="font-size: 14px; color: #666;">
+                You received this based on your schedule preference for day results notifications.
+            </p>
+        </div>
+        """,
+        metadata={'test': True, 'category': 'day_results'}
+    )
+    results['day_results'] = result1
+    
+    # Test notification 2: Vote Reminders category
+    result2 = nolofication.send_notification(
+        user_id=user.provider_user_id,
+        title="🧪 Test: Vote Reminder Notification",
+        message="This is a test of the vote_reminders notification category. You should receive this based on your vote_reminders schedule preference.",
+        notification_type='info',
+        category='vote_reminders',
+        html_message="""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2ee9ff;">🧪 Test: Vote Reminder</h2>
+            <p>This is a <strong>test notification</strong> for the <code>vote_reminders</code> category.</p>
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #ffc107;">
+                <p style="margin: 0;">📝 This category is used to remind you when a new day begins.</p>
+            </div>
+            <p style="font-size: 14px; color: #666;">
+                You received this based on your schedule preference for vote reminder notifications.
+            </p>
+        </div>
+        """,
+        metadata={'test': True, 'category': 'vote_reminders'}
+    )
+    results['vote_reminders'] = result2
+    
+    # Check if both succeeded
+    success = result1.get('success') and result2.get('success')
+    
+    return jsonify({
+        'ok': success,
+        'message': f'Test notifications sent to {user.display_name}' if success else 'Some notifications failed',
+        'user': user.display_name,
+        'keyn_id': user.provider_user_id,
+        'results': results
+    })
+
+
+@admin_bp.route('/cancel-test-reminders', methods=['POST'])
+@require_admin
+def cancel_test_reminders():
+    """Cancel pending vote reminder notifications for the current admin user"""
+    from ..utils.nolofication import nolofication
+    
+    # Get current user
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    user = User.query.get(user_id)
+    if not user or not user.provider_user_id:
+        return jsonify({'error': 'User not found or not linked to KeyN'}), 400
+    
+    # Check if Nolofication is configured
+    if not nolofication.is_configured():
+        return jsonify({
+            'error': 'Nolofication not configured',
+            'message': 'Please set NOLOFICATION_API_KEY in your .env file'
+        }), 400
+    
+    # Get pending vote_reminders for this user
+    pending = nolofication.get_pending_notifications(
+        user_id=user.provider_user_id,
+        category='vote_reminders'
+    )
+    
+    if 'error' in pending:
+        return jsonify({
+            'ok': False,
+            'error': pending['error'],
+            'message': 'Failed to fetch pending notifications'
+        })
+    
+    pending_list = pending.get('pending_notifications', [])
+    
+    if not pending_list:
+        return jsonify({
+            'ok': True,
+            'message': 'No pending vote reminders found',
+            'user': user.display_name,
+            'cancelled': 0,
+            'pending': []
+        })
+    
+    # Cancel all pending vote reminders
+    cancelled_count = 0
+    cancelled_ids = []
+    errors = []
+    
+    for notif in pending_list:
+        result = nolofication.cancel_pending_notification(notif['id'])
+        if result.get('message'):
+            cancelled_count += 1
+            cancelled_ids.append(notif['id'])
+        else:
+            errors.append(f"Failed to cancel notification {notif['id']}: {result.get('error')}")
+    
+    return jsonify({
+        'ok': True,
+        'message': f"Cancelled {cancelled_count} pending vote reminder(s)",
+        'user': user.display_name,
+        'cancelled': cancelled_count,
+        'cancelled_ids': cancelled_ids,
+        'pending': pending_list,
+        'errors': errors if errors else None
+    })
+
+
 @admin_bp.route('/projects', methods=['GET'])
 @require_admin
 def list_projects():

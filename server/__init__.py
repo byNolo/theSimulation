@@ -52,3 +52,4 @@ def create_app():
         ensure_today()
 
     return app
+
