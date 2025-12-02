@@ -1,0 +1,16 @@
+[Unit]
+Description=TheSimulation day tick (finalize previous day, create new day)
+After=network.target
+
+[Service]
+Type=oneshot
+User=${USER}
+WorkingDirectory=/home/sam/theSimulation/server
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/home/sam/theSimulation/server/.venv/bin:/usr/bin:/bin
+ExecStart=/home/sam/theSimulation/server/.venv/bin/python /home/sam/theSimulation/server/scripts/tick_day.py
+StandardOutput=append:/home/sam/theSimulation/logs/tick_day.log
+StandardError=append:/home/sam/theSimulation/logs/tick_day.log
+
+[Install]
+WantedBy=multi-user.target

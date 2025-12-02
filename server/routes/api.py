@@ -72,9 +72,28 @@ def finalize_day(day):
             break
     
     ws.last_event = f"Community chose: {option_label}"
+
+    # Attempt to atomically claim finalization for this day. This prevents
+    # duplicate finalization when multiple processes detect an un-finalized
+    # day at the same time (e.g. multiple requests hitting the server at
+    # midnight). We update the day row only if `chosen_option` is still NULL.
+    from sqlalchemy import update
+
+    res = db.session.execute(
+        update(Day)
+        .where(Day.id == day.id)
+        .where(Day.chosen_option.is_(None))
+        .values(chosen_option=top)
+    )
+
+    # If no rows were affected, another process already finalized the day.
+    if getattr(res, 'rowcount', 0) == 0:
+        db.session.rollback()
+        logger.info(f"Day {day.id} already finalized by another process; skipping notifications")
+        return
+
+    # We successfully claimed finalization; persist world state and telemetry.
     day.chosen_option = top
-    
-    # Save changes
     db.session.add(ws)
     db.session.add(day)
     db.session.add(Telemetry(

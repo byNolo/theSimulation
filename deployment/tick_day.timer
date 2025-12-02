@@ -1,0 +1,11 @@
+[Unit]
+Description=Timer to run TheSimulation day tick at midnight America/New_York
+
+[Timer]
+# Run daily at 00:00 America/New_York. Systemd timers use the system timezone
+# by default; if the host is UTC, you can set the system timezone or use a cron entry.
+OnCalendar=*-*-* 00:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
