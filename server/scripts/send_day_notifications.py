@@ -36,6 +36,32 @@ def send_day_result_notifications(day_id: int, chosen_option_label: str, new_sta
         logger.warning("Nolofication not configured - skipping day result notifications")
         return
     
+    # Avoid sending if Nolofication already has pending/sent notifications for this day
+    try:
+        from server.models import Telemetry
+
+        # Check recent telemetry for notifications for this day
+        recent_notifs = Telemetry.query.filter_by(event_type='notification').order_by(Telemetry.created_at.desc()).limit(200).all()
+        for t in recent_notifs:
+            payload = t.payload or {}
+            if payload.get('category') == 'day_results' and payload.get('day_id') == day_id:
+                logger.info(f"Day {day_id} result notification already recorded in telemetry; skipping duplicate send")
+                return {'skipped': True, 'reason': 'already_recorded_in_telemetry'}
+    except Exception:
+        # If Telemetry table isn't available or query fails, continue and rely on Nolofication checks below
+        logger.debug("Telemetry check for existing day result notifications failed or unavailable")
+
+    # Also check Nolofication pending notifications for this category/day
+    try:
+        pending = nolofication.get_pending_notifications(category='day_results')
+        for notif in pending.get('pending_notifications', []):
+            meta = notif.get('metadata') or {}
+            if meta.get('day_id') == day_id:
+                logger.info(f"Day {day_id} result notification already pending in Nolofication; skipping duplicate send")
+                return {'skipped': True, 'reason': 'already_pending_in_nolofication'}
+    except Exception:
+        logger.debug("Failed to query Nolofication pending notifications for day results")
+
     # Get all registered users
     all_users = User.query.filter(User.provider_user_id.isnot(None)).all()
     
@@ -129,6 +155,19 @@ def send_day_result_notifications(day_id: int, chosen_option_label: str, new_sta
         }
     )
     
+    # Log a telemetry entry recording that we attempted to send notifications
+    try:
+        from server.models import Telemetry
+        db.session.add(Telemetry(event_type='notification', payload={
+            'category': 'day_results',
+            'day_id': day_id,
+            'result': result
+        }, user_id=None))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.debug("Failed to write telemetry for day result notification")
+
     # Check if notifications were sent/scheduled successfully
     if result.get('scheduled', 0) > 0 or result.get('successful', 0) > 0:
         total_sent = result.get('scheduled', 0) + result.get('successful', 0)
@@ -151,6 +190,29 @@ def send_vote_reminder_for_new_day(new_day_id: int):
         logger.warning("Nolofication not configured - skipping vote reminders")
         return
     
+    # Avoid sending if Nolofication already has pending/sent vote_reminders for this day
+    try:
+        from server.models import Telemetry
+        recent_notifs = Telemetry.query.filter_by(event_type='notification').order_by(Telemetry.created_at.desc()).limit(200).all()
+        for t in recent_notifs:
+            payload = t.payload or {}
+            if payload.get('category') == 'vote_reminders' and payload.get('day_id') == new_day_id:
+                logger.info(f"Vote reminders for day {new_day_id} already recorded in telemetry; skipping duplicate send")
+                return {'skipped': True, 'reason': 'already_recorded_in_telemetry'}
+    except Exception:
+        logger.debug("Telemetry check for existing vote reminders failed or unavailable")
+
+    # Also check Nolofication pending notifications for this category/day
+    try:
+        pending = nolofication.get_pending_notifications(category='vote_reminders')
+        for notif in pending.get('pending_notifications', []):
+            meta = notif.get('metadata') or {}
+            if meta.get('day_id') == new_day_id:
+                logger.info(f"Vote reminders for day {new_day_id} already pending in Nolofication; skipping duplicate send")
+                return {'skipped': True, 'reason': 'already_pending_in_nolofication'}
+    except Exception:
+        logger.debug("Failed to query Nolofication pending notifications for vote reminders")
+
     # Get the new day and event
     day = Day.query.get(new_day_id)
     event = Event.query.filter_by(day_id=new_day_id).first()
@@ -227,6 +289,19 @@ def send_vote_reminder_for_new_day(new_day_id: int):
         }
     )
     
+    # Log telemetry for this send attempt
+    try:
+        from server.models import Telemetry
+        db.session.add(Telemetry(event_type='notification', payload={
+            'category': 'vote_reminders',
+            'day_id': new_day_id,
+            'result': result
+        }, user_id=None))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.debug("Failed to write telemetry for vote reminder notification")
+
     # Check if notifications were sent/scheduled successfully
     if result.get('scheduled', 0) > 0 or result.get('successful', 0) > 0:
         total_sent = result.get('scheduled', 0) + result.get('successful', 0)
