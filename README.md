@@ -1,14 +1,20 @@
 # The Simulation
 
+> **v2.0 GAME BALANCE OVERHAUL** - The game is now significantly harder with passive decay, random disasters, cascade failures, and amplified event consequences. Projects are essential for survival. See [GAME_BALANCE_OVERHAUL.md](GAME_BALANCE_OVERHAUL.md) and [SURVIVAL_GUIDE.md](SURVIVAL_GUIDE.md) for details.
+
 A multiplayer social experiment where collective choices shape a persistent world. Each day, players vote on how their community responds to events, with consequences that ripple through time.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## 🎮 Features
+## Features
 
-- **Daily Events**: 38+ dynamic events across 4 categories (Crisis, Opportunity, Narrative, General)
+- **Daily Events**: 44+ dynamic events across 4 categories (Crisis, Opportunity, Narrative, General) including 6 new extreme crises
 - **Collective Decision Making**: Community votes determine the outcome
-- **Persistent World**: Morale, Supplies, and Threat levels evolve based on choices
+- **Persistent World**: Morale, Supplies, Threat, and Population evolve based on choices
+- **Passive Decay System**: Stats naturally decline without action - projects are essential
+- **Random Disasters**: 15% daily chance of unexpected events outside player control
+- **Cascade Failures**: Critical stats trigger additional penalties
+- **Base Building**: 15 projects with meaningful buffs to counter decay
 - **Smart Event System**: Events appear based on world conditions and day progression
 - **OAuth Authentication**: Secure login via KeyN
 - **Admin Dashboard**: Event management, metrics, history tracking, and telemetry
@@ -16,7 +22,7 @@ A multiplayer social experiment where collective choices shape a persistent worl
 - **Responsive Design**: Modern glass-morphism UI with dynamic backgrounds
 - **Real-time Updates**: Live vote tallies and stat changes
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 **Frontend:**
 - React 18 + TypeScript
@@ -31,7 +37,7 @@ A multiplayer social experiment where collective choices shape a persistent worl
 - Session-based authentication
 - OAuth 2.0 (KeyN)
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Automated Setup (Recommended)
 
@@ -116,7 +122,7 @@ source .venv/bin/activate
 python scripts/set_admin.py YOUR_USERNAME
 ```
 
-## 📖 Documentation
+## Documentation
 
 - [Gameplay Documentation](GAMEPLAY.md) - Event system, mechanics, win/lose conditions
 - [Fresh Start Guide](FRESH_START.md) - Reset and initialize the simulation
@@ -128,13 +134,15 @@ python scripts/set_admin.py YOUR_USERNAME
 - [Privacy Policy](PRIVACY_POLICY.md) - How we handle your data
 - [Security Policy](SECURITY.md) - Security practices and reporting vulnerabilities
 
-## 🎯 Game Mechanics
+## Game Mechanics
 
 ### Stats
 
 - **Morale** (0-100): Community mental well-being. Game over at 0.
 - **Supplies** (0-100): Food, water, resources. Game over at 0.
 - **Threat** (0-100): External danger. Game over at 100.
+- **Population** (0-1000): Number of survivors. Game over at 0.
+- **Production** (0-100): Building rate for projects.
 
 ### Event Categories
 
@@ -150,7 +158,7 @@ python scripts/set_admin.py YOUR_USERNAME
 - Manually tick days
 - Toggle event activation
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 theSimulation/
@@ -175,7 +183,7 @@ theSimulation/
 └── README.md
 ```
 
-## 🔧 Development
+## Development
 
 ### Backend Tasks
 
@@ -215,7 +223,7 @@ What it does:
 Notes:
 - This script is intended for simple/staging use. For production-grade deployments use a process manager (systemd, supervisor, or containers) and a reverse proxy (nginx) with TLS terminated externally.
 
-## 🔔 Notifications
+## Notifications
 
 The Simulation integrates with [Nolofication](https://nolofication.bynolo.ca) v2 to send automated notifications with user-controlled scheduling.
 
@@ -267,7 +275,7 @@ Notifications are sent automatically when day transitions occur. No scheduler ne
 
 For more details on Nolofication integration, see [Nolofication_INTEGRATION_GUIDE.md](Nolofication_INTEGRATION_GUIDE.md).
 
-## 🚀 Production Deployment
+## Production Deployment
 
 For deploying to production with Cloudflare Tunnel at `thesim.bynolo.ca`, see the comprehensive [DEPLOYMENT.md](DEPLOYMENT.md) guide.
 
@@ -287,7 +295,7 @@ source .venv/bin/activate
 python scripts/reset_simulation.py
 ```
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Please:
 
@@ -297,23 +305,24 @@ Contributions welcome! Please:
 4. Push to branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-- KeyN OAuth for authentication system
+- KeyN OAuth byNolo for authentication system
+- Nolofication byNolo for notification service
 - Tailwind CSS for styling framework
 - Flask and React communities
 
-## 📧 Contact
+## Contact
 
-Project Link: [https://github.com/yourusername/theSimulation](https://github.com/yourusername/theSimulation)
+Project Link: [https://github.com/byNolo/theSimulation](https://github.com/byNolo/theSimulation)
 
 ---
 
-**Note**: This is a social experiment and game. Have fun making tough choices! 🎲
+**Note**: This is a social experiment and game. Have fun making tough choices! 
 
 
 1. Persistence layer (SQLite initial vs Postgres for production?)
@@ -323,7 +332,3 @@ Project Link: [https://github.com/yourusername/theSimulation](https://github.com
 5. Vote mechanics (single vote per day enforcement?)
 6. Scaling considerations (stateless API + caching?)
 7. Visual world representation (canvas/webgl/dynamic backgrounds?)
-
-## License
-
-(Choose a license, e.g. MIT) Placeholder.

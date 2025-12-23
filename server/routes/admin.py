@@ -31,163 +31,26 @@ def find_event_template_by_options(options):
 @require_admin
 def api_tick():
     """Finalize current day and advance to next day"""
+    from ..routes.api import finalize_day, ensure_today
+    
     day, ws, ev = get_current()
-    votes = Vote.query.filter_by(day_id=day.id).all()
-    tally = {}
-    for v in votes:
-        tally[v.option] = tally.get(v.option, 0) + 1
     
-    # Determine winning option
-    if tally:
-        max_count = max(tally.values())
-        top_options = sorted([opt for opt, c in tally.items() if c == max_count])
-        top = top_options[0]  # If tie, alphabetically first
-    else:
-        # No votes - pick first option
-        top = ev.options[0]['key'] if isinstance(ev.options[0], dict) else ev.options[0]
+    # Finalize the current day (applies votes, decay, disasters, etc.)
+    finalize_day(day)
     
-    # Find the event template to get correct deltas
-    template = find_event_template_by_options(ev.options)
-    deltas = deltas_for_option(top, template)
+    # Ensure the next day exists
+    new_day = ensure_today()
     
-    # Apply changes with bounds checking
-    new_morale = max(0, min(100, ws.morale + deltas.get('morale', 0)))
-    new_supplies = max(0, min(100, ws.supplies + deltas.get('supplies', 0)))
-    new_threat = max(0, min(100, ws.threat + deltas.get('threat', 0)))
+    # Get the new state
+    new_ws = WorldState.query.filter_by(day_id=new_day.id).first()
     
-    # Check for game over conditions
-    game_over = False
-    game_over_reason = None
-    
-    if new_morale <= 0:
-        game_over = True
-        game_over_reason = "The community has lost all hope and disbanded."
-    elif new_supplies <= 0:
-        game_over = True
-        game_over_reason = "The community has run out of supplies and perished."
-    elif new_threat >= 100:
-        game_over = True
-        game_over_reason = "The threat has overwhelmed the community."
-    
-    # Update world state
-    ws.morale = new_morale
-    ws.supplies = new_supplies
-    ws.threat = new_threat
-    
-    # Get the option label if available
-    option_label = top
-    for opt in ev.options:
-        if isinstance(opt, dict) and opt.get('key') == top:
-            option_label = opt.get('label', top)
-            break
-    
-    ws.last_event = f"Community chose: {option_label}"
-    day.chosen_option = top
-    
-    user_id = session.get('user_id')
-    
-    # Log the tick event
-    telemetry_payload = {
-        'chosen': top,
-        'tally': tally,
-        'deltas': deltas,
-        'new_state': {
-            'morale': new_morale,
-            'supplies': new_supplies,
-            'threat': new_threat
-        }
-    }
-    
-    if game_over:
-        telemetry_payload['game_over'] = True
-        telemetry_payload['reason'] = game_over_reason
-        ws.last_event = game_over_reason
-    
-    # Mark objects as modified and add telemetry
-    db.session.add(ws)
-    db.session.add(day)
-    db.session.add(Telemetry(event_type='tick', payload=telemetry_payload, user_id=user_id))
-    
-    # ====== PROJECT PROGRESSION ======
-    production = int((new_morale * 0.1) + (new_supplies * 0.1))
-    
-    active_proj = ActiveProject.query.first()
-    project_msg = None
-    
-    if active_proj:
-        active_proj.progress += production
-        if active_proj.progress >= active_proj.project.cost:
-            # Complete project
-            completed = CompletedProject(project_id=active_proj.project_id)
-            db.session.add(completed)
-            project_msg = f"Project Completed: {active_proj.project.name}"
-            
-            # Log completion
-            db.session.add(Telemetry(
-                event_type='project_complete',
-                payload={'project_id': active_proj.project_id, 'name': active_proj.project.name},
-                user_id=user_id
-            ))
-            
-            db.session.delete(active_proj)
-            active_proj = None
-        else:
-            project_msg = f"Project Progress: {active_proj.project.name} (+{production})"
-            
-    # If no active project (or just finished), check votes to start new one
-    if not active_proj:
-        # Get all votes
-        p_votes = ProjectVote.query.all()
-        if p_votes:
-            tally = {}
-            for v in p_votes:
-                tally[v.project_id] = tally.get(v.project_id, 0) + 1
-            
-            if tally:
-                # Pick winner
-                winner_id = max(tally, key=tally.get)
-                # Verify not completed
-                if not CompletedProject.query.filter_by(project_id=winner_id).first():
-                    new_active = ActiveProject(project_id=winner_id)
-                    db.session.add(new_active)
-                    proj = Project.query.get(winner_id)
-                    project_msg = f"Construction Started: {proj.name}" if not project_msg else f"{project_msg} | Started: {proj.name}"
-                    
-                    # Log start
-                    db.session.add(Telemetry(
-                        event_type='project_start',
-                        payload={'project_id': winner_id, 'name': proj.name},
-                        user_id=user_id
-                    ))
-                    
-                    # Clear votes
-                    for v in p_votes:
-                        db.session.delete(v)
-
-    db.session.commit()
-    
-    # Create next day for preview (unless game over)
-    if not game_over:
-        from ..routes.api import ensure_today
-        ensure_today()
-    
-    response = {
+    return jsonify({
         'ok': True,
-        'chosen': top,
-        'tally': tally,
-        'deltas': deltas,
-        'new_state': {
-            'morale': new_morale,
-            'supplies': new_supplies,
-            'threat': new_threat
-        }
-    }
-    
-    if game_over:
-        response['game_over'] = True
-        response['reason'] = game_over_reason
-    
-    return jsonify(response)
+        'day': new_day.id,
+        'morale': new_ws.morale,
+        'supplies': new_ws.supplies,
+        'threat': new_ws.threat
+    })
 
 
 @admin_bp.route('/test-notification', methods=['POST'])

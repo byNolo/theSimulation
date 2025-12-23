@@ -38,6 +38,7 @@ class WorldState(db.Model):
     supplies: Mapped[int] = mapped_column(Integer)
     threat: Mapped[int] = mapped_column(Integer)
     last_event: Mapped[str] = mapped_column(String(200))
+    population: Mapped[int] = mapped_column(Integer, default=20)  # Community size affects consumption/production
 
     day: Mapped[Day] = relationship(back_populates='world_state')
 

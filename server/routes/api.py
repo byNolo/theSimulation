@@ -21,6 +21,14 @@ def est_today():
 def finalize_day(day):
     """Apply the winning vote and update stats for a completed day"""
     from ..events import deltas_for_option, ALL_EVENTS
+    from ..game_mechanics import (
+        get_completed_project_buffs,
+        calculate_passive_decay,
+        check_cascade_failures,
+        roll_random_disaster,
+        apply_production_to_project,
+        calculate_population_change
+    )
     
     ws = WorldState.query.filter_by(day_id=day.id).first()
     ev = Event.query.filter_by(day_id=day.id).first()
@@ -52,17 +60,81 @@ def finalize_day(day):
             template = t
             break
     
+    # Get deltas from player choice
     deltas = deltas_for_option(top, template)
     
+    # === NEW GAME MECHANICS ===
+    
+    # Get buffs from completed projects
+    buffs = get_completed_project_buffs()
+    logger.info(f"Active buffs: {buffs}")
+    
+    # Calculate passive decay
+    current_pop = getattr(ws, 'population', 20)
+    decay = calculate_passive_decay(ws.morale, ws.supplies, ws.threat, current_pop, buffs)
+    logger.info(f"Passive decay: {decay}")
+    
+    # Check for cascade failures
+    cascade_penalties = check_cascade_failures(ws.morale, ws.supplies, ws.threat)
+    logger.info(f"Cascade penalties: {cascade_penalties}")
+    
+    # Roll for random disaster
+    disaster = roll_random_disaster(ws.morale, ws.supplies, ws.threat)
+    disaster_deltas = disaster['deltas'] if disaster else {'morale': 0, 'supplies': 0, 'threat': 0}
+    if disaster:
+        logger.info(f"Random disaster occurred: {disaster['name']}")
+    
+    # Combine all changes
+    total_morale_change = (
+        deltas.get('morale', 0) +
+        decay['morale'] +
+        cascade_penalties['morale'] +
+        disaster_deltas['morale']
+    )
+    total_supplies_change = (
+        deltas.get('supplies', 0) +
+        decay['supplies'] +
+        cascade_penalties['supplies'] +
+        disaster_deltas['supplies']
+    )
+    total_threat_change = (
+        deltas.get('threat', 0) +
+        decay['threat'] +
+        cascade_penalties['threat'] +
+        disaster_deltas['threat']
+    )
+    
     # Apply changes with bounds checking
-    new_morale = max(0, min(100, ws.morale + deltas.get('morale', 0)))
-    new_supplies = max(0, min(100, ws.supplies + deltas.get('supplies', 0)))
-    new_threat = max(0, min(100, ws.threat + deltas.get('threat', 0)))
+    new_morale = max(0, min(100, ws.morale + total_morale_change))
+    new_supplies = max(0, min(100, ws.supplies + total_supplies_change))
+    new_threat = max(0, min(100, ws.threat + total_threat_change))
+    
+    # Calculate population change
+    # 1. Natural growth/decline based on stats
+    natural_pop_change = calculate_population_change(new_morale, new_supplies, new_threat, current_pop)
+    
+    # 2. Event-driven population change (from deltas)
+    event_pop_change = deltas.get('population', 0)
+    
+    # Combine changes
+    # Note: calculate_population_change returns the NEW total, so we need to extract the delta
+    natural_delta = natural_pop_change - current_pop
+    total_pop_change = natural_delta + event_pop_change
+    
+    new_population = max(0, current_pop + total_pop_change)
+    
+    # Apply production to active project
+    project_info = apply_production_to_project(ws, buffs)
+    
+    # Check if we should start a new project (if none active)
+    from ..game_mechanics import check_and_start_project
+    new_project_info = check_and_start_project()
     
     # Update world state
     ws.morale = new_morale
     ws.supplies = new_supplies
     ws.threat = new_threat
+    ws.population = new_population
     
     # Get the option label if available
     option_label = top
@@ -71,7 +143,33 @@ def finalize_day(day):
             option_label = opt.get('label', top)
             break
     
-    ws.last_event = f"Community chose: {option_label}"
+    # Build last_event message with all changes
+    event_parts = [f"Community chose: {option_label}"]
+    if disaster:
+        event_parts.append(f"⚠️ {disaster['name']}: {disaster['description']}")
+    if cascade_penalties['morale'] < 0 or cascade_penalties['supplies'] < 0:
+        event_parts.append("⚠️ Cascade failures occurred")
+    if project_info and project_info.get('completed'):
+        event_parts.append(f"✅ {project_info['name']} completed!")
+    if new_project_info and new_project_info.get('started'):
+        event_parts.append(f"🏗️ Construction started: {new_project_info['name']}")
+    if new_population != current_pop:
+        pop_change = new_population - current_pop
+        event_parts.append(f"Population: {current_pop} → {new_population} ({pop_change:+d})")
+    
+    # Check for Game Over conditions
+    game_over_reasons = []
+    if new_morale <= 0:
+        game_over_reasons.append("Morale collapsed")
+    if new_supplies <= 0:
+        game_over_reasons.append("Supplies depleted")
+    if new_threat >= 100:
+        game_over_reasons.append("Overwhelmed by threat")
+        
+    if game_over_reasons:
+        event_parts.append(f"💀 GAME OVER: {', '.join(game_over_reasons)}")
+    
+    ws.last_event = " | ".join(event_parts)
 
     # Attempt to atomically claim finalization for this day. This prevents
     # duplicate finalization when multiple processes detect an un-finalized
@@ -102,8 +200,24 @@ def finalize_day(day):
             'day_id': day.id,
             'chosen': top,
             'tally': tally,
-            'deltas': deltas,
-            'new_state': {'morale': new_morale, 'supplies': new_supplies, 'threat': new_threat}
+            'choice_deltas': deltas,
+            'decay': decay,
+            'cascade_penalties': cascade_penalties,
+            'disaster': disaster['name'] if disaster else None,
+            'disaster_deltas': disaster_deltas,
+            'total_changes': {
+                'morale': total_morale_change,
+                'supplies': total_supplies_change,
+                'threat': total_threat_change
+            },
+            'new_state': {
+                'morale': new_morale,
+                'supplies': new_supplies,
+                'threat': new_threat,
+                'population': new_population
+            },
+            'project_info': project_info,
+            'buffs': buffs
         },
         user_id=None
     ))
@@ -185,8 +299,10 @@ def ensure_today():
         supplies = last_state.supplies
         threat = last_state.threat
         last_event = last_state.last_event
+        population = getattr(last_state, 'population', 20)
     else:
         morale, supplies, threat, last_event = 70, 80, 30, 'Genesis'
+        population = 20
     
     template = choose_template(morale, supplies, threat, day_count + 1)
     day = Day(est_date=today)
@@ -199,7 +315,7 @@ def ensure_today():
         # Store option labels for display
         option_data = [{"key": o.key, "label": o.label, "description": o.description} for o in template.options]
         
-        ws = WorldState(day_id=day.id, morale=morale, supplies=supplies, threat=threat, last_event=last_event)
+        ws = WorldState(day_id=day.id, morale=morale, supplies=supplies, threat=threat, last_event=last_event, population=population)
         ev = Event(day_id=day.id, headline=template.headline, description=template.description, options=option_data)
         db.session.add_all([ws, ev])
         
@@ -274,9 +390,10 @@ def api_state():
         'morale': ws.morale,
         'supplies': ws.supplies,
         'threat': ws.threat,
+        'population': getattr(ws, 'population', 20),
         'last_event': ws.last_event,
         'est_date': day.est_date.isoformat(),
-        'production': int((ws.morale * 0.1) + (ws.supplies * 0.1)),  # Base production formula
+        'production': int((ws.morale * 0.15) + (ws.supplies * 0.15)),  # Updated production formula
     })
 
 

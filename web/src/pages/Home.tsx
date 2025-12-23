@@ -9,7 +9,7 @@ import Header from '../components/Header'
 import WelcomeModal from '../components/WelcomeModal'
 import BaseDashboard from '../components/BaseDashboard'
 
-type WorldState = { day: number; morale: number; supplies: number; threat: number; last_event: string; production?: number }
+type WorldState = { day: number; morale: number; supplies: number; threat: number; population?: number; last_event: string; production?: number }
 type EventData = { day: number; headline: string; description: string; options: string[] }
 
 const Home: React.FC = () => {
@@ -234,12 +234,17 @@ const Home: React.FC = () => {
 
         {/* World stats */}
         {world && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <StatBar label="Morale" value={world.morale} color="#10b981" />
-            <StatBar label="Supplies" value={world.supplies} color="#f59e0b" />
-            <StatBar label="Threat" value={world.threat} color="#ef4444" />
-            <StatBar label="Production" value={world.production || 0} color="#3b82f6" max={50} />
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <StatBar label="Morale" value={world.morale} color="#10b981" />
+              <StatBar label="Supplies" value={world.supplies} color="#f59e0b" />
+              <StatBar label="Threat" value={world.threat} color="#ef4444" />
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <StatBar label="Population" value={world.population || 20} color="#8b5cf6" max={70} />
+              <StatBar label="Production" value={world.production || 0} color="#3b82f6" max={50} />
+            </div>
+          </>
         )}
 
         {/* Current event */}
@@ -298,12 +303,20 @@ const Home: React.FC = () => {
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="truncate max-w-xs">Last: {world.last_event}</span>
+                  <span className={`truncate max-w-xs ${
+                    world.last_event.includes('⚠️') || world.last_event.includes('CRITICAL') 
+                      ? 'text-red-400 font-semibold animate-pulse' 
+                      : world.last_event.includes('✅') 
+                        ? 'text-green-400' 
+                        : ''
+                  }`}>
+                    Last: {world.last_event}
+                  </span>
                 </div>
               )}
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <span className="px-3 py-1 glass-effect-dark rounded-full">Beta v0.2.2</span>
+              <span className="px-3 py-1 glass-effect-dark rounded-full">Beta v0.3.1</span>
               {me?.authenticated && me?.user?.is_admin && (
                 <a href="/admin" className="px-3 py-1 glass-effect-dark rounded-full hover:bg-white/10 transition-colors">
                   Admin

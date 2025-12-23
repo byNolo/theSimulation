@@ -147,7 +147,7 @@ const BaseDashboard: React.FC<BaseDashboardProps> = ({
                                     <div className="flex items-center justify-between mb-1">
                                         <span className="font-semibold text-green-400">2. Generate Production</span>
                                     </div>
-                                    <p className="text-sm text-gray-400">Your community produces units daily based on Morale and Supplies (10% of each). This automatically goes to the active project.</p>
+                                    <p className="text-sm text-gray-400">Your community produces units daily based on Morale and Supplies (15% of each). This automatically goes to the active project. Projects can boost this further!</p>
                                 </div>
                                 <div className="glass-effect-dark rounded-lg p-3">
                                     <div className="flex items-center justify-between mb-1">

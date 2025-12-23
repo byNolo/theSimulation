@@ -29,6 +29,12 @@ const StatBar: React.FC<{ label: string; value: number; color: string; max?: num
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
           </svg>
         )
+      case 'population':
+        return (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        )
       default:
         return null
     }
@@ -40,6 +46,7 @@ const StatBar: React.FC<{ label: string; value: number; color: string; max?: num
       case 'supplies': return 'glow-amber'
       case 'threat': return 'glow-red'
       case 'production': return 'glow-blue'
+      case 'population': return 'glow-purple'
       default: return ''
     }
   }
@@ -111,10 +118,30 @@ const StatBar: React.FC<{ label: string; value: number; color: string; max?: num
           { range: '25+', label: 'Booming', effect: 'Rapid development and expansion.', color: 'text-green-400' }
         ],
         tips: [
-          'Production is calculated from Morale and Supplies (10% of each)',
+          'Production is calculated from Morale and Supplies (15% of each)',
           'Keep Morale high to ensure workers are motivated',
           'Maintain Supplies to provide materials for construction',
-          'Vote for projects that boost Production to snowball your growth'
+          'Build Workshop or Generator projects to boost production permanently'
+        ]
+      }
+    }
+
+    if (labelLower === 'population') {
+      return {
+        title: '👥 Community Population',
+        description: 'The number of people in your settlement. More people means more consumption but also more potential.',
+        ranges: [
+          { range: '10-14', label: 'Critical', effect: 'Too few people. Production reduced by 30%. Risk of collapse.', color: 'text-red-400' },
+          { range: '15-25', label: 'Stable', effect: 'Sustainable community size. Balanced consumption.', color: 'text-yellow-400' },
+          { range: '26-50', label: 'Growing', effect: 'Expanding population. Requires more supplies but stronger community.', color: 'text-green-400' },
+          { range: '51+', label: 'Thriving', effect: 'Large settlement! Requires Housing Expansion projects to support.', color: 'text-blue-400' }
+        ],
+        tips: [
+          'Population grows when morale and supplies are high (>70) and threat is low (<30)',
+          'People leave or die when conditions are harsh (morale/supplies <25 or threat >80)',
+          'Each person beyond 20 increases supply consumption by 0.2/day',
+          'Build Housing Expansion project to increase maximum population capacity',
+          'Population below 15 reduces production by 30%'
         ]
       }
     }
