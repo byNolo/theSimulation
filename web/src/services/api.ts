@@ -84,6 +84,13 @@ export async function adminTick() {
   })
 }
 
+export async function adminTestAi() {
+  return fetchJson('/api/admin/test-ai', {
+    method: 'POST',
+    credentials: 'include'
+  })
+}
+
 export async function testNotification() {
   return fetchJson('/api/admin/test-notification', {
     method: 'POST',
@@ -135,6 +142,27 @@ export async function toggleEvent(dbId: number) {
   })
 }
 
+// Announcement endpoints
+export async function getAnnouncement() {
+  return fetchJson('/api/announcement', { credentials: 'include' })
+}
+
+export async function createAnnouncement(data: { 
+  title: string; 
+  content: string; 
+  version?: string;
+  template_id?: string;
+  show_popup?: boolean;
+  send_notification?: boolean;
+}) {
+  return fetchJson('/api/admin/announce', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+    credentials: 'include'
+  })
+}
+
 // User management endpoints
 export async function listUsers(page = 1, perPage = 50) {
   return fetchJson(`/api/admin/users?page=${page}&per_page=${perPage}`, {
@@ -170,8 +198,9 @@ export async function getUserStats() {
 
 export default {
   getMe, getState, getEvent, vote, getTally, getMyVote, getHistory,
-  getMetrics, getAdminHistory, getTelemetry, adminTick, testNotification, cancelTestReminders,
+  getMetrics, getAdminHistory, getTelemetry, adminTick, adminTestAi, testNotification, cancelTestReminders,
   listEvents, createEvent, updateEvent, deleteEvent, toggleEvent,
   listUsers, getUser, toggleUserAdmin, deleteUser, getUserStats,
-  getCommunityMessages, getProjects, voteProject, getHistoryPage
+  getCommunityMessages, getProjects, voteProject, getHistoryPage,
+  getAnnouncement, createAnnouncement
 }

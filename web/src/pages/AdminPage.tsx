@@ -73,7 +73,15 @@ const AdminPage: React.FC = () => {
   const [telemetry, setTelemetry] = useState<any[] | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'users'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'users' | 'projects'>('overview')
+
+  // Announcement state
+  const [announceTitle, setAnnounceTitle] = useState('')
+  const [announceContent, setAnnounceContent] = useState('')
+  const [announceVersion, setAnnounceVersion] = useState('')
+  const [announceTemplate, setAnnounceTemplate] = useState('standard')
+  const [announcePopup, setAnnouncePopup] = useState(true)
+  const [announceNotify, setAnnounceNotify] = useState(true)
 
   const drift = computeDrift(history)
 
@@ -115,7 +123,24 @@ const AdminPage: React.FC = () => {
     }
   }
 
+  const [aiResult, setAiResult] = useState<any>(null)
+
+  const handleTestAi = async () => {
+    if (!confirm('Generate test AI content? This will consume API credits.')) return
+    try {
+      setLoading(true)
+      const res = await api.adminTestAi()
+      setAiResult(res)
+      setMsg('AI generation successful')
+    } catch (e: any) {
+      setMsg(e?.message || String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleTick = async () => {
+    if (!confirm('Are you sure you want to force a day tick? This cannot be undone.')) return
     try {
       const res = await api.adminTick()
       setMsg(`Day ticked successfully: ${JSON.stringify(res)}`)
@@ -155,6 +180,33 @@ const AdminPage: React.FC = () => {
       setMsg(`❌ Error: ${e?.error || e?.message || String(e)}`)
     }
   }
+
+  const handleBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!confirm('Are you sure you want to broadcast this announcement to ALL users?')) return
+    
+    try {
+      setLoading(true)
+      await api.createAnnouncement({
+        title: announceTitle,
+        content: announceContent,
+        version: announceVersion,
+        template_id: announceTemplate,
+        show_popup: announcePopup,
+        send_notification: announceNotify
+      })
+      setMsg('✅ Announcement broadcast successfully!')
+      setAnnounceTitle('')
+      setAnnounceContent('')
+      setAnnounceVersion('')
+      setAnnounceTemplate('standard')
+    } catch (e: any) {
+      setMsg(e?.message || String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
 
   if (loading) {
     return (
@@ -285,6 +337,20 @@ const AdminPage: React.FC = () => {
                 🧪 Test Notifications
               </button>
               <button
+                onClick={handleTestAi}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg"
+                title="Generate a test AI event, summary, and chatter without saving"
+              >
+                🤖 Test AI Generation
+              </button>
+              <button
+                onClick={handleTick}
+                className="px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg"
+                title="Force the simulation to advance to the next day immediately"
+              >
+                ⚡ Force Tick Day
+              </button>
+              <button
                 onClick={handleCancelTestReminders}
                 className="px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg"
                 title="Cancel any pending vote reminder notifications for yourself (tests the cancel feature)"
@@ -301,6 +367,162 @@ const AdminPage: React.FC = () => {
               </svg>
               <span className="text-sm text-yellow-300 font-mono break-all">{msg}</span>
             </div>
+          )}
+          
+          {/* AI Test Results */}
+          {aiResult && activeTab === 'overview' && (
+            <div className="mt-6 glass-effect-dark rounded-xl p-6 border border-blue-500/30">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-blue-300 flex items-center gap-2">
+                  <span className="text-2xl">🤖</span> AI Generation Test Result
+                </h3>
+                <button 
+                  onClick={() => setAiResult(null)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="space-y-6">
+                {/* Event */}
+                <div className="bg-black/20 rounded-lg p-4">
+                  <div className="text-xs text-blue-400 uppercase font-bold mb-2">Generated Event</div>
+                  <h4 className="text-xl font-bold text-white mb-2">{aiResult.event.headline}</h4>
+                  <p className="text-gray-300 mb-4">{aiResult.event.description}</p>
+                  
+                  <div className="grid gap-2">
+                    {aiResult.event.options.map((opt: any, i: number) => (
+                      <div key={i} className="bg-white/5 p-3 rounded border border-white/10">
+                        <div className="flex justify-between">
+                          <span className="font-bold text-indigo-300">{opt.label}</span>
+                          <span className="text-xs text-gray-500 font-mono">
+                            M:{opt.deltas.morale} S:{opt.deltas.supplies} T:{opt.deltas.threat} P:{opt.deltas.population}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">{opt.description}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Chatter */}
+                <div className="bg-black/20 rounded-lg p-4">
+                  <div className="text-xs text-blue-400 uppercase font-bold mb-2">Generated Chatter</div>
+                  <div className="space-y-3">
+                    {aiResult.chatter.map((c: any, i: number) => (
+                      <div key={i} className="bg-white/5 p-3 rounded">
+                        <div className="text-sm text-white mb-2">"{c.content}"</div>
+                        {c.replies && c.replies.length > 0 && (
+                          <div className="pl-4 border-l-2 border-white/10 space-y-2 mt-2">
+                            {c.replies.map((r: string, j: number) => (
+                              <div key={j} className="text-xs text-gray-400">↳ "{r}"</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Summary */}
+                <div className="bg-black/20 rounded-lg p-4">
+                  <div className="text-xs text-blue-400 uppercase font-bold mb-2">Generated Summary</div>
+                  <div className="text-sm text-gray-400 mb-2">
+                    Simulated Choice: <span className="text-white font-bold">{aiResult.simulated_choice}</span>
+                  </div>
+                  <p className="text-gray-300 italic border-l-4 border-blue-500 pl-4 py-1">
+                    "{aiResult.summary}"
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Feature Announcement */}
+          {activeTab === 'overview' && (
+            <section className="glass-effect rounded-2xl p-6 mt-6">
+              <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <span className="text-2xl">📢</span> Broadcast Feature Announcement
+              </h3>
+              <form onSubmit={handleBroadcast} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Template</label>
+                    <select
+                      value={announceTemplate}
+                      onChange={e => setAnnounceTemplate(e.target.value)}
+                      className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-sky-500"
+                    >
+                      <option value="standard">Standard (Text)</option>
+                      <option value="ai_launch">AI Launch Special</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Channels</label>
+                    <div className="flex gap-4 mt-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={announcePopup}
+                          onChange={e => setAnnouncePopup(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-600 text-sky-600 focus:ring-sky-500 bg-gray-700"
+                        />
+                        <span className="text-sm text-gray-300">Site Popup</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={announceNotify}
+                          onChange={e => setAnnounceNotify(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-600 text-sky-600 focus:ring-sky-500 bg-gray-700"
+                        />
+                        <span className="text-sm text-gray-300">Nolofication</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={announceTitle}
+                    onChange={e => setAnnounceTitle(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-sky-500"
+                    placeholder="e.g. New AI Features!"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Version (Optional)</label>
+                  <input
+                    type="text"
+                    value={announceVersion}
+                    onChange={e => setAnnounceVersion(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-sky-500"
+                    placeholder="e.g. v0.4.0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Content</label>
+                  <textarea
+                    value={announceContent}
+                    onChange={e => setAnnounceContent(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-sky-500 h-32"
+                    placeholder="Describe the new features..."
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-6 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Broadcasting...' : 'Broadcast to All Users'}
+                </button>
+              </form>
+            </section>
           )}
         </div>
 

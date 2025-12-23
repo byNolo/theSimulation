@@ -1,6 +1,6 @@
 # The Simulation
 
-> **v2.0 GAME BALANCE OVERHAUL** - The game is now significantly harder with passive decay, random disasters, cascade failures, and amplified event consequences. Projects are essential for survival. See [GAME_BALANCE_OVERHAUL.md](GAME_BALANCE_OVERHAUL.md) and [SURVIVAL_GUIDE.md](SURVIVAL_GUIDE.md) for details.
+> **v0.4.1 AI NARRATIVE UPDATE** - The simulation is now powered by a sophisticated AI Storyteller. Events, summaries, and community chatter are dynamically generated based on your history and choices. See [CHANGELOG.md](CHANGELOG.md) for details.
 
 A multiplayer social experiment where collective choices shape a persistent world. Each day, players vote on how their community responds to events, with consequences that ripple through time.
 
@@ -8,19 +8,22 @@ A multiplayer social experiment where collective choices shape a persistent worl
 
 ## Features
 
-- **Daily Events**: 44+ dynamic events across 4 categories (Crisis, Opportunity, Narrative, General) including 6 new extreme crises
-- **Collective Decision Making**: Community votes determine the outcome
-- **Persistent World**: Morale, Supplies, Threat, and Population evolve based on choices
-- **Passive Decay System**: Stats naturally decline without action - projects are essential
-- **Random Disasters**: 15% daily chance of unexpected events outside player control
-- **Cascade Failures**: Critical stats trigger additional penalties
-- **Base Building**: 15 projects with meaningful buffs to counter decay
-- **Smart Event System**: Events appear based on world conditions and day progression
-- **OAuth Authentication**: Secure login via KeyN
-- **Admin Dashboard**: Event management, metrics, history tracking, and telemetry
-- **Custom Events**: Admins can create/edit/toggle custom events via UI
-- **Responsive Design**: Modern glass-morphism UI with dynamic backgrounds
-- **Real-time Updates**: Live vote tallies and stat changes
+- **AI Storyteller**: Powered by DeepSeek V3 via OpenRouter. (Optional)
+  - **Context-Aware Events**: Daily crises generated based on the last 3 days of history.
+  - **Narrative Summaries**: Atmospheric journal entries summarizing the day's outcome.
+  - **Community Chatter**: AI-generated citizens debate choices and react to morale/events.
+- **Announcement System**: Broadcast updates via site popups and Nolofication (email/push).
+- **Daily Events**: Dynamic events across 4 categories (Crisis, Opportunity, Narrative, General).
+- **Collective Decision Making**: Community votes determine the outcome.
+- **Persistent World**: Morale, Supplies, Threat, and Population evolve based on choices.
+- **Passive Decay System**: Stats naturally decline without action - projects are essential.
+- **Random Disasters**: 15% daily chance of unexpected events outside player control.
+- **Cascade Failures**: Critical stats trigger additional penalties.
+- **Base Building**: 15 projects with meaningful buffs to counter decay.
+- **OAuth Authentication**: Secure login via KeyN.
+- **Admin Dashboard**: Event management, metrics, history tracking, and telemetry.
+- **Responsive Design**: Modern glass-morphism UI with dynamic backgrounds.
+- **Real-time Updates**: Live vote tallies and stat changes.
 
 ## Tech Stack
 
@@ -38,6 +41,17 @@ A multiplayer social experiment where collective choices shape a persistent worl
 - OAuth 2.0 (KeyN)
 
 ## Quick Start
+
+### Configuration
+
+Create a `.env` file in the `server` directory (or root) with the following:
+
+```bash
+SECRET_KEY=your_secret_key
+DATABASE_URL=sqlite:///simulation.db
+ADMIN_TOKEN=your_admin_token
+OPENROUTER_API_KEY=your_openrouter_key  # Optional: Enables AI generation
+```
 
 ### Automated Setup (Recommended)
 

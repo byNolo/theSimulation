@@ -4,7 +4,8 @@ from datetime import datetime
 from ..db import db
 from ..models import Day, WorldState, Event, Vote, Telemetry, User
 from ..models_projects import Project, ActiveProject, CompletedProject, ProjectVote
-from ..events import choose_template, find_template_by_options
+from ..events import choose_template, find_template_by_options, EventTemplate, Option
+from ..ai_generator import generate_daily_event, generate_day_summary
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
 import logging
@@ -169,7 +170,19 @@ def finalize_day(day):
     if game_over_reasons:
         event_parts.append(f"💀 GAME OVER: {', '.join(game_over_reasons)}")
     
-    ws.last_event = " | ".join(event_parts)
+    # Try AI summary
+    try:
+        summary = generate_day_summary(day.id, ev.headline, option_label, deltas, disaster['name'] if disaster else None)
+        if summary:
+            # Append critical info if not present
+            if game_over_reasons:
+                 summary += f" GAME OVER: {', '.join(game_over_reasons)}"
+            ws.last_event = summary
+        else:
+            ws.last_event = " | ".join(event_parts)
+    except Exception as e:
+        logger.error(f"AI summary generation failed: {e}")
+        ws.last_event = " | ".join(event_parts)
 
     # Attempt to atomically claim finalization for this day. This prevents
     # duplicate finalization when multiple processes detect an un-finalized
@@ -304,7 +317,50 @@ def ensure_today():
         morale, supplies, threat, last_event = 70, 80, 30, 'Genesis'
         population = 20
     
-    template = choose_template(morale, supplies, threat, day_count + 1)
+    # Try AI generation first
+    template = None
+    try:
+        # Fetch recent history (last 3 days)
+        recent_days = Day.query.order_by(Day.id.desc()).limit(3).all()
+        recent_history = []
+        for d in reversed(recent_days):
+            ev = Event.query.filter_by(day_id=d.id).first()
+            if ev:
+                recent_history.append({
+                    'day': d.id,
+                    'headline': ev.headline,
+                    'choice': d.chosen_option or "None"
+                })
+
+        # Create a temporary WorldState object for the generator
+        temp_ws = WorldState(morale=morale, supplies=supplies, threat=threat, last_event=last_event, population=population)
+        ai_event_data = generate_daily_event(temp_ws, day_count + 1, recent_history)
+        
+        if ai_event_data:
+            # Convert dict to EventTemplate-like object
+            options = [
+                Option(
+                    key=opt['key'],
+                    label=opt['label'],
+                    deltas=opt['deltas'],
+                    description=opt.get('description')
+                )
+                for opt in ai_event_data['options']
+            ]
+            template = EventTemplate(
+                id=f"ai_event_{day_count+1}",
+                headline=ai_event_data['headline'],
+                description=ai_event_data['description'],
+                category=ai_event_data.get('category', 'general'),
+                options=options
+            )
+            logger.info(f"Generated AI event for day {day_count+1}")
+    except Exception as e:
+        logger.error(f"AI event generation failed: {e}")
+
+    if not template:
+        template = choose_template(morale, supplies, threat, day_count + 1)
+
     day = Day(est_date=today)
     db.session.add(day)
     
@@ -840,3 +896,22 @@ def api_project_vote():
     db.session.commit()
     
     return jsonify({'ok': True, 'message': 'Vote registered'})
+
+
+@api_bp.route('/announcement')
+def get_announcement():
+    from ..models import Announcement
+    # Get the most recent active announcement that should be shown as a popup
+    announcement = Announcement.query.filter_by(is_active=True, show_popup=True).order_by(Announcement.created_at.desc()).first()
+    if not announcement:
+        return jsonify(None)
+    
+    return jsonify({
+        'id': announcement.id,
+        'title': announcement.title,
+        'content': announcement.content,
+        'html_content': announcement.html_content,
+        'version': announcement.version,
+        'created_at': announcement.created_at.isoformat()
+    })
+

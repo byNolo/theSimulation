@@ -136,6 +136,59 @@ def test_notification():
     })
 
 
+@admin_bp.route('/test-ai', methods=['POST'])
+@require_admin
+def test_ai_generation():
+    """Generate a test AI event, summary, and chatter without saving"""
+    from ..ai_generator import generate_daily_event, generate_day_summary, generate_community_chatter
+    from ..models import Day, Event
+    
+    day, ws, _ = get_current()
+    
+    # Fetch recent history (last 3 days)
+    recent_days = Day.query.order_by(Day.id.desc()).limit(3).all()
+    recent_history = []
+    for d in reversed(recent_days):
+        ev = Event.query.filter_by(day_id=d.id).first()
+        if ev:
+            recent_history.append({
+                'day': d.id,
+                'headline': ev.headline,
+                'choice': d.chosen_option or "None"
+            })
+
+    # 1. Generate Event
+    event_data = generate_daily_event(ws, day.id + 1, recent_history)
+    
+    if not event_data:
+        return jsonify({'error': 'Failed to generate event'}), 500
+        
+    # 2. Generate Chatter (based on the new event)
+    chatter_data = generate_community_chatter(event_data['headline'], ws)
+    
+    # 3. Generate Summary (simulating a random choice)
+    # Pick the first option as the "choice" for the test
+    choice = event_data['options'][0]
+    choice_label = choice['label']
+    deltas = choice['deltas']
+    
+    summary = generate_day_summary(
+        day.id + 1, 
+        event_data['headline'], 
+        choice_label, 
+        deltas
+    )
+    
+    return jsonify({
+        'ok': True,
+        'event': event_data,
+        'chatter': chatter_data,
+        'summary': summary,
+        'simulated_choice': choice_label,
+        'simulated_deltas': deltas
+    })
+
+
 @admin_bp.route('/cancel-test-reminders', methods=['POST'])
 @require_admin
 def cancel_test_reminders():
@@ -752,4 +805,68 @@ def user_stats():
         'active_users': active_users,
         'inactive_users': total_users - active_users
     })
+
+
+@admin_bp.route('/announce', methods=['POST'])
+@require_admin
+def create_announcement():
+    from ..models import Announcement, User
+    from ..utils.nolofication import NoloficationService
+    from ..utils.announcement_templates import TEMPLATES
+    
+    data = request.get_json()
+    title = data.get('title')
+    content = data.get('content')
+    version = data.get('version')
+    template_id = data.get('template_id', 'standard')
+    show_popup = data.get('show_popup', True)
+    send_notification = data.get('send_notification', True)
+    
+    if not title or not content:
+        return jsonify({'error': 'Title and content are required'}), 400
+        
+    # Generate HTML content based on template
+    template = TEMPLATES.get(template_id, TEMPLATES['standard'])
+    generator = template['generator']
+    rendered = generator(title, content, version)
+    
+    popup_html = rendered['popup_html']
+    email_html = rendered['email_html']
+        
+    # Create announcement
+    announcement = Announcement(
+        title=title,
+        content=content,
+        html_content=popup_html,
+        version=version,
+        show_popup=show_popup,
+        send_notification=send_notification,
+        created_by=session.get('user_id') # Use session user_id directly as g.user might not be set in all contexts
+    )
+    db.session.add(announcement)
+    db.session.commit()
+    
+    # Broadcast via Nolofication
+    if send_notification:
+        ns = NoloficationService()
+        if ns.is_configured():
+            # Get all users with provider_user_id
+            users = User.query.filter(User.provider_user_id.isnot(None)).all()
+            user_ids = [u.provider_user_id for u in users]
+            
+            # Send in batches of 50 to avoid hitting limits or timeouts
+            batch_size = 50
+            for i in range(0, len(user_ids), batch_size):
+                batch = user_ids[i:i + batch_size]
+                ns.send_bulk_notification(
+                    user_ids=batch,
+                    title=f"New Feature: {title}",
+                    message=content, # Plain text fallback
+                    notification_type='info',
+                    category='announcement',
+                    html_message=email_html
+                )
+        
+    return jsonify({'success': True, 'id': announcement.id})
+
 

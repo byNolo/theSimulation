@@ -43,6 +43,20 @@ class WorldState(db.Model):
     day: Mapped[Day] = relationship(back_populates='world_state')
 
 
+class Announcement(db.Model):
+    __tablename__ = 'announcements'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200))
+    content: Mapped[str] = mapped_column(Text)
+    html_content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    version: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    show_popup: Mapped[bool] = mapped_column(Boolean, default=True)
+    send_notification: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_by: Mapped[int] = mapped_column(ForeignKey('users.id'))
+
+
 class Event(db.Model):
     __tablename__ = 'events'
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

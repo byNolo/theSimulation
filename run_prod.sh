@@ -93,7 +93,7 @@ pkill -f "theSimulation/web.*vite preview" || true
 sleep 1
 
 echo "Starting backend with gunicorn on 0.0.0.0:$PORT (workers=$WORKERS)"
-nohup "$BACKEND_VENV/bin/gunicorn" -w "$WORKERS" -b "0.0.0.0:$PORT" server.app:app --log-level info > "$LOG_DIR/backend.log" 2>&1 &
+nohup "$BACKEND_VENV/bin/gunicorn" -w "$WORKERS" -b "0.0.0.0:$PORT" --timeout 120 server.app:app --log-level info > "$LOG_DIR/backend.log" 2>&1 &
 echo $! > "$BACKEND_DIR/gunicorn.pid"
 
 # Frontend: ensure dependencies, build, then preview

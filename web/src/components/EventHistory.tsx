@@ -180,6 +180,14 @@ const EventHistory: React.FC<{
                     })}
                   </div>
 
+                  {/* Day Summary / Outcome */}
+                  {entry.state.last_event && (
+                    <div className="glass-effect p-3 rounded-lg border-l-2 border-indigo-500">
+                      <div className="text-xs text-indigo-300 mb-1 font-semibold">Outcome Summary</div>
+                      <p className="text-sm text-gray-300 italic">"{entry.state.last_event}"</p>
+                    </div>
+                  )}
+
                   {/* World state at that time */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="glass-effect p-3 rounded-lg">

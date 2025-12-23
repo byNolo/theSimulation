@@ -1,6 +1,10 @@
 import random
 from typing import List, Dict, Optional
 from ..models import CommunityMessage, WorldState
+from ..ai_generator import generate_community_chatter
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Names for fake users
 NAMES = [
@@ -245,6 +249,60 @@ def generate_messages_for_day(day_id: int, event_category: str, world_state: Wor
     context = "general"
     if event_category in TEMPLATES:
         context = event_category
+
+    # Try AI generation first
+    try:
+        # Only use AI if we have an event headline (which we should)
+        ai_comments = generate_community_chatter(event_headline or "Current Situation", world_state)
+        
+        if ai_comments:
+            for comment_obj in ai_comments:
+                # Handle both string (old format) and dict (new format)
+                if isinstance(comment_obj, str):
+                    content = comment_obj
+                    replies = []
+                else:
+                    content = comment_obj.get('content', '')
+                    replies = comment_obj.get('replies', [])
+
+                author = random.choice(NAMES)
+                avatar_seed = f"{author}_{random.randint(0, 1000)}"
+                
+                # Simple sentiment logic
+                sentiment = "neutral"
+                if context == "crisis" or world_state.morale < 40:
+                    sentiment = "negative"
+                elif context == "opportunity" or world_state.morale > 70:
+                    sentiment = "positive"
+
+                msg_data = {
+                    "day_id": day_id,
+                    "author_name": author,
+                    "avatar_seed": avatar_seed,
+                    "content": content,
+                    "sentiment": sentiment,
+                    "replies": []
+                }
+                
+                # Add AI generated replies
+                for reply_content in replies:
+                    reply_author = random.choice([n for n in NAMES if n != author])
+                    msg_data["replies"].append({
+                        "day_id": day_id,
+                        "author_name": reply_author,
+                        "avatar_seed": f"{reply_author}_{random.randint(0, 1000)}",
+                        "content": reply_content,
+                        "sentiment": "neutral"
+                    })
+                
+                messages.append(msg_data)
+            
+            # If we got enough messages, return them
+            if len(messages) >= 3:
+                 return messages
+    except Exception as e:
+        logger.error(f"AI chatter generation failed: {e}")
+        # Fallback to template generation
     
     # Select templates based on stats
     available_templates = []
