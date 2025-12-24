@@ -10,6 +10,13 @@ from zoneinfo import ZoneInfo
 from datetime import datetime, date, timedelta
 import logging
 import os
+from dotenv import load_dotenv
+
+# Load environment variables before importing server modules
+# This ensures that module-level variables (like OPENROUTER_API_KEY in server/llm.py) are initialized correctly
+env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.env'))
+if os.path.exists(env_path):
+    load_dotenv(env_path)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
