@@ -169,6 +169,15 @@ def finalize_day(day):
         
     if game_over_reasons:
         event_parts.append(f"💀 GAME OVER: {', '.join(game_over_reasons)}")
+        
+        # Update simulation status
+        from ..models import SimulationStatus
+        sim_status = SimulationStatus.query.first()
+        if sim_status:
+            sim_status.is_active = False
+            sim_status.ended_at = datetime.utcnow()
+            sim_status.end_reason = ", ".join(game_over_reasons)
+            db.session.add(sim_status)
     
     # Try AI summary
     try:
@@ -287,6 +296,13 @@ def finalize_day(day):
 
 
 def ensure_today():
+    # Check if simulation is active
+    from ..models import SimulationStatus
+    sim_status = SimulationStatus.query.first()
+    if sim_status and not sim_status.is_active:
+        logger.info("Simulation is ended. ensure_today skipping creation of new day.")
+        return Day.query.order_by(Day.id.desc()).first()
+
     today = est_today()
     day = Day.query.filter_by(est_date=today).first()
     if day:
@@ -317,46 +333,57 @@ def ensure_today():
         morale, supplies, threat, last_event = 70, 80, 30, 'Genesis'
         population = 20
     
-    # Try AI generation first
     template = None
-    try:
-        # Fetch recent history (last 3 days)
-        recent_days = Day.query.order_by(Day.id.desc()).limit(3).all()
-        recent_history = []
-        for d in reversed(recent_days):
-            ev = Event.query.filter_by(day_id=d.id).first()
-            if ev:
-                recent_history.append({
-                    'day': d.id,
-                    'headline': ev.headline,
-                    'choice': d.chosen_option or "None"
-                })
+    
+    # Force Day 1 Event
+    if day_count == 0:
+        from ..events import NARRATIVE_EVENTS
+        for t in NARRATIVE_EVENTS:
+            if t.id == 'genesis_day_1':
+                template = t
+                logger.info("Using forced Day 1 Genesis event")
+                break
+    
+    # Try AI generation first if no template selected yet
+    if not template:
+        try:
+            # Fetch recent history (last 3 days)
+            recent_days = Day.query.order_by(Day.id.desc()).limit(3).all()
+            recent_history = []
+            for d in reversed(recent_days):
+                ev = Event.query.filter_by(day_id=d.id).first()
+                if ev:
+                    recent_history.append({
+                        'day': d.id,
+                        'headline': ev.headline,
+                        'choice': d.chosen_option or "None"
+                    })
 
-        # Create a temporary WorldState object for the generator
-        temp_ws = WorldState(morale=morale, supplies=supplies, threat=threat, last_event=last_event, population=population)
-        ai_event_data = generate_daily_event(temp_ws, day_count + 1, recent_history)
-        
-        if ai_event_data:
-            # Convert dict to EventTemplate-like object
-            options = [
-                Option(
-                    key=opt['key'],
-                    label=opt['label'],
-                    deltas=opt['deltas'],
-                    description=opt.get('description')
+            # Create a temporary WorldState object for the generator
+            temp_ws = WorldState(morale=morale, supplies=supplies, threat=threat, last_event=last_event, population=population)
+            ai_event_data = generate_daily_event(temp_ws, day_count + 1, recent_history)
+            
+            if ai_event_data:
+                # Convert dict to EventTemplate-like object
+                options = [
+                    Option(
+                        key=opt['key'],
+                        label=opt['label'],
+                        deltas=opt['deltas'],
+                        description=opt.get('description')
+                    )
+                    for opt in ai_event_data['options']
+                ]
+                template = EventTemplate(
+                    id=f"ai_event_{day_count+1}",
+                    headline=ai_event_data['headline'],
+                    description=ai_event_data['description'],
+                    category=ai_event_data.get('category', 'general'),
+                    options=options
                 )
-                for opt in ai_event_data['options']
-            ]
-            template = EventTemplate(
-                id=f"ai_event_{day_count+1}",
-                headline=ai_event_data['headline'],
-                description=ai_event_data['description'],
-                category=ai_event_data.get('category', 'general'),
-                options=options
-            )
-            logger.info(f"Generated AI event for day {day_count+1}")
-    except Exception as e:
-        logger.error(f"AI event generation failed: {e}")
+                logger.info(f"Generated AI event for day {day_count+1}")
+        except Exception as e:
+            logger.error(f"AI event generation failed: {e}")
 
     if not template:
         template = choose_template(morale, supplies, threat, day_count + 1)
@@ -441,6 +468,15 @@ def tally_for_day(day_id: int):
 @api_bp.route('/state')
 def api_state():
     day, ws, _ = get_current()
+    
+    from ..models import SimulationStatus
+    sim_status = SimulationStatus.query.first()
+    status_data = {
+        'is_active': sim_status.is_active if sim_status else True,
+        'ended_at': sim_status.ended_at.isoformat() if sim_status and sim_status.ended_at else None,
+        'end_reason': sim_status.end_reason if sim_status else None
+    }
+    
     return jsonify({
         'day': day.id,
         'morale': ws.morale,
@@ -450,6 +486,7 @@ def api_state():
         'last_event': ws.last_event,
         'est_date': day.est_date.isoformat(),
         'production': int((ws.morale * 0.15) + (ws.supplies * 0.15)),  # Updated production formula
+        'simulation_status': status_data
     })
 
 

@@ -181,6 +181,22 @@ const AdminPage: React.FC = () => {
     }
   }
 
+  const handleResetSimulation = async () => {
+    if (!confirm('DANGER: This will ARCHIVE the current database and RESET the simulation to Day 1. This cannot be undone easily. Are you sure?')) return
+    if (!confirm('Are you REALLY sure? All current progress will be wiped.')) return
+    
+    try {
+      setLoading(true)
+      const res = await api.resetSimulation()
+      setMsg(`Simulation reset successfully: ${res.message}`)
+      await loadAll()
+    } catch (e: any) {
+      setMsg(e?.message || String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!confirm('Are you sure you want to broadcast this announcement to ALL users?')) return
@@ -356,6 +372,24 @@ const AdminPage: React.FC = () => {
                 title="Cancel any pending vote reminder notifications for yourself (tests the cancel feature)"
               >
                 🚫 Cancel Test Reminders
+              </button>
+            </div>
+          )}
+
+          {/* Danger Zone */}
+          {activeTab === 'overview' && (
+            <div className="mt-8 border-t border-red-500/30 pt-6">
+              <h3 className="text-red-400 font-bold mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Danger Zone
+              </h3>
+              <button
+                onClick={handleResetSimulation}
+                className="px-6 py-3 bg-red-900/50 hover:bg-red-900/80 border border-red-500/50 text-red-200 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg"
+              >
+                ☢️ Archive & Reset Simulation
               </button>
             </div>
           )}

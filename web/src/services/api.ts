@@ -98,6 +98,13 @@ export async function testNotification() {
   })
 }
 
+export async function resetSimulation() {
+  return fetchJson('/api/admin/reset-simulation', {
+    method: 'POST',
+    credentials: 'include'
+  })
+}
+
 export async function cancelTestReminders() {
   return fetchJson('/api/admin/cancel-test-reminders', {
     method: 'POST',
@@ -202,5 +209,5 @@ export default {
   listEvents, createEvent, updateEvent, deleteEvent, toggleEvent,
   listUsers, getUser, toggleUserAdmin, deleteUser, getUserStats,
   getCommunityMessages, getProjects, voteProject, getHistoryPage,
-  getAnnouncement, createAnnouncement
+  getAnnouncement, createAnnouncement, resetSimulation
 }

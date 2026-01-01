@@ -483,6 +483,24 @@ OPPORTUNITY_EVENTS: List[EventTemplate] = [
 # ====== NARRATIVE/STORY EVENTS ======
 NARRATIVE_EVENTS: List[EventTemplate] = [
     EventTemplate(
+        id="genesis_day_1",
+        headline="Day 1: The First Sunrise",
+        description="We have established a perimeter. The old world is gone, and what remains is ours to shape. The survivors look to you for direction. Our first priority will define who we are.",
+        category="narrative",
+        requires_day=1,
+        options=[
+            Option("secure_perimeter", "Secure the Perimeter", 
+                   {"morale": -5, "supplies": -10, "threat": -20},
+                   "Safety first. We need to know we can sleep at night."),
+            Option("scavenge_supplies", "Scavenge for Supplies", 
+                   {"morale": +5, "supplies": +20, "threat": +5},
+                   "We can't build anything on empty stomachs."),
+            Option("establish_order", "Establish Community Order", 
+                   {"morale": +15, "supplies": -5, "threat": 0},
+                   "Hope and organization are our strongest weapons."),
+        ],
+    ),
+    EventTemplate(
         id="mysterious_signal",
         headline="Strange Signal Detected",
         description="The old radio has picked up a repeating signal. It could be other survivors—or a trap.",

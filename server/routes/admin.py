@@ -6,6 +6,9 @@ from ..models_projects import Project, ActiveProject, CompletedProject, ProjectV
 from ..db import db
 from ..events import deltas_for_option, ALL_EVENTS
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -51,6 +54,81 @@ def api_tick():
         'supplies': new_ws.supplies,
         'threat': new_ws.threat
     })
+
+
+@admin_bp.route('/reset-simulation', methods=['POST'])
+@require_admin
+def reset_simulation_route():
+    """Archive current DB and start a fresh simulation"""
+    import shutil
+    import os
+    from ..models import Day, Event, WorldState, Vote, Telemetry, SimulationStatus, CommunityMessage
+    from ..models_projects import ActiveProject, CompletedProject, ProjectVote
+    from ..config import Config
+    
+    # 1. Archive Database
+    # Handle relative paths in SQLALCHEMY_DATABASE_URI
+    db_uri = Config.SQLALCHEMY_DATABASE_URI
+    if db_uri.startswith('sqlite:///'):
+        db_path = db_uri.replace('sqlite:///', '')
+        # If it's a relative path, make it absolute relative to server root or wherever it is
+        if not os.path.isabs(db_path):
+            # Assuming db is in server/ folder based on config.py: os.path.join(os.path.dirname(__file__), 'simulation.db')
+            # But Config is loaded from server/config.py, so __file__ there is server/config.py.
+            # Here we are in server/routes/admin.py.
+            # Let's try to resolve it safely.
+            # Actually, Config.SQLALCHEMY_DATABASE_URI usually has the absolute path if set via os.path.join in config.py
+            pass
+            
+        if os.path.exists(db_path):
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            archive_path = f"{db_path}.{timestamp}.bak"
+            try:
+                shutil.copy2(db_path, archive_path)
+                logger.info(f"Database archived to {archive_path}")
+            except Exception as e:
+                logger.error(f"Failed to archive database: {e}")
+                # Continue anyway? Or fail? User said "maybe just a copy of the db", implies it's important.
+                # But if we can't copy, maybe we shouldn't delete.
+                return jsonify({'error': f"Failed to archive database: {str(e)}"}), 500
+    
+    # 2. Reset Data
+    try:
+        # Delete in correct order
+        ProjectVote.query.delete()
+        ActiveProject.query.delete()
+        CompletedProject.query.delete()
+        Vote.query.delete()
+        Telemetry.query.delete()
+        CommunityMessage.query.delete()
+        Event.query.delete()
+        WorldState.query.delete()
+        Day.query.delete()
+        
+        # Reset Status
+        status = SimulationStatus.query.first()
+        if not status:
+            status = SimulationStatus()
+            db.session.add(status)
+        
+        status.is_active = True
+        status.started_at = datetime.utcnow()
+        status.ended_at = None
+        status.end_reason = None
+        
+        db.session.commit()
+        
+        # 3. Initialize Day 1
+        from ..routes.api import ensure_today
+        ensure_today()
+        
+        return jsonify({'ok': True, 'message': 'Simulation reset successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error resetting simulation: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 
 @admin_bp.route('/test-notification', methods=['POST'])

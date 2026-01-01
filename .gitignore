@@ -28,6 +28,7 @@ MANIFEST
 *.db
 *.sqlite
 *.sqlite3
+*.bak
 
 # Virtual Environment
 .venv/

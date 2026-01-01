@@ -8,8 +8,22 @@ import CommunityBoard from '../components/CommunityBoard'
 import Header from '../components/Header'
 import WelcomeModal from '../components/WelcomeModal'
 import BaseDashboard from '../components/BaseDashboard'
+import GameOverScreen from '../components/GameOverScreen'
 
-type WorldState = { day: number; morale: number; supplies: number; threat: number; population?: number; last_event: string; production?: number }
+type WorldState = { 
+  day: number; 
+  morale: number; 
+  supplies: number; 
+  threat: number; 
+  population?: number; 
+  last_event: string; 
+  production?: number;
+  simulation_status?: {
+    is_active: boolean;
+    ended_at: string | null;
+    end_reason: string | null;
+  }
+}
 type EventData = { day: number; headline: string; description: string; options: string[] }
 
 const Home: React.FC = () => {
@@ -205,6 +219,22 @@ const Home: React.FC = () => {
   const bgEffects = getBackgroundEffects()
 
   const handleHistorySearch = useCallback((s: string) => { setHistorySearch(s); setHistoryPage(1) }, [])
+
+  // Game Over Screen
+  if (world?.simulation_status && !world.simulation_status.is_active) {
+    return (
+      <GameOverScreen 
+        endReason={world.simulation_status.end_reason}
+        daysSurvived={world.day}
+        finalStats={{
+          morale: world.morale,
+          supplies: world.supplies,
+          threat: world.threat,
+          population: world.population || 20
+        }}
+      />
+    )
+  }
 
   return (
     <div className="min-h-screen p-6 max-w-6xl mx-auto relative">

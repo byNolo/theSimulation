@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import db
 # Import project models to ensure they are registered with SQLAlchemy
 from .models_projects import Project, ActiveProject, CompletedProject, ProjectVote
+from .models_custom_events import CustomEvent
 
 
 class User(db.Model):
@@ -93,31 +94,15 @@ class Telemetry(db.Model):
     user_id: Mapped[Optional[int]] = mapped_column(ForeignKey('users.id'), nullable=True)
 
 
-class CustomEvent(db.Model):
-    """Custom events created by admins"""
-    __tablename__ = 'custom_events'
+class SimulationStatus(db.Model):
+    """Tracks the global status of the simulation"""
+    __tablename__ = 'simulation_status'
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    event_id: Mapped[str] = mapped_column(String(100), unique=True)
-    headline: Mapped[str] = mapped_column(String(200))
-    description: Mapped[str] = mapped_column(Text)
-    category: Mapped[str] = mapped_column(String(50), default='general')
-    weight: Mapped[int] = mapped_column(Integer, default=1)
-    
-    min_morale: Mapped[int] = mapped_column(Integer, default=0)
-    max_morale: Mapped[int] = mapped_column(Integer, default=100)
-    min_supplies: Mapped[int] = mapped_column(Integer, default=0)
-    max_supplies: Mapped[int] = mapped_column(Integer, default=100)
-    min_threat: Mapped[int] = mapped_column(Integer, default=0)
-    max_threat: Mapped[int] = mapped_column(Integer, default=100)
-    requires_day: Mapped[int] = mapped_column(Integer, default=0)
-    
-    options: Mapped[dict] = mapped_column(JSON)
-    
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    created_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    end_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
 
 class CommunityMessage(db.Model):
