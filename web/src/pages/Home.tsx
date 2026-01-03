@@ -9,6 +9,7 @@ import Header from '../components/Header'
 import WelcomeModal from '../components/WelcomeModal'
 import BaseDashboard from '../components/BaseDashboard'
 import GameOverScreen from '../components/GameOverScreen'
+import Skeleton from '../components/Skeleton'
 
 type WorldState = { 
   day: number; 
@@ -27,8 +28,8 @@ type WorldState = {
 type EventData = { day: number; headline: string; description: string; options: string[] }
 
 const Home: React.FC = () => {
-  const { data: world } = useFetch<WorldState>('/api/state', [])
-  const { data: event } = useFetch<EventData>('/api/event', [])
+  const { data: world, loading: worldLoading } = useFetch<WorldState>('/api/state', [])
+  const { data: event, loading: eventLoading } = useFetch<EventData>('/api/event', [])
   const [submitting, setSubmitting] = useState<string | null>(null)
   const [tally, setTally] = useState<Record<string, number>>({})
   const [message, setMessage] = useState<string | null>(null)
@@ -306,7 +307,19 @@ const Home: React.FC = () => {
 
         {/* World stats - Always visible on desktop, only on Overview tab on mobile */}
         <div className={`${activeTab === 'overview' ? 'block' : 'hidden'} md:block`}>
-          {world && (
+          {worldLoading && !world ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <Skeleton className="h-32" />
+                <Skeleton className="h-32" />
+                <Skeleton className="h-32" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+                <Skeleton className="h-32" />
+                <Skeleton className="h-32" />
+              </div>
+            </>
+          ) : world && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <StatBar label="Morale" value={world.morale} color="#10b981" />
@@ -321,7 +334,9 @@ const Home: React.FC = () => {
           )}
 
           {/* Daily Briefing (Last Event Summary) */}
-          {world?.last_event && (
+          {worldLoading && !world ? (
+            <Skeleton className="h-40 mb-6" />
+          ) : world?.last_event && (
             <div className="glass-effect rounded-xl p-6 border-l-4 border-indigo-500 relative overflow-hidden mb-6">
                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -z-10" />
               <h3 className="text-lg font-semibold text-indigo-300 mb-2 flex items-center gap-2">
@@ -337,7 +352,9 @@ const Home: React.FC = () => {
           )}
 
           {/* Current event */}
-          {event && (
+          {eventLoading && !event ? (
+            <Skeleton className="h-96" />
+          ) : event && (
             <EventCard
               event={event}
               onVote={vote}
@@ -352,7 +369,24 @@ const Home: React.FC = () => {
 
         {/* Base Dashboard - Always visible on desktop, only on Projects tab on mobile */}
         <div className={`${activeTab === 'projects' ? 'block' : 'hidden'} md:block`}>
-          {projectsData && (
+          {!projectsData ? (
+            <div className="space-y-8">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-8 w-32 rounded-full" />
+              </div>
+              <Skeleton className="h-48" />
+              <div>
+                <Skeleton className="h-8 w-48 mb-4" />
+                <div className="grid md:grid-cols-2 gap-4">
+                  <Skeleton className="h-40" />
+                  <Skeleton className="h-40" />
+                  <Skeleton className="h-40" />
+                  <Skeleton className="h-40" />
+                </div>
+              </div>
+            </div>
+          ) : (
             <BaseDashboard
               projects={projectsData.projects}
               activeProject={projectsData.active_project}
@@ -367,19 +401,47 @@ const Home: React.FC = () => {
         <div className={`${activeTab === 'community' ? 'block' : 'hidden'} md:block`}>
           <div className="flex flex-col-reverse md:grid md:grid-cols-3 gap-4 md:gap-6">
             <div className="md:col-span-2">
-              <EventHistory
-                history={history}
-                page={historyPage}
-                pages={historyPages}
-                total={historyTotal}
-                perPage={historyPerPage}
-                search={historySearch}
-                onPageChange={(p) => setHistoryPage(p)}
-                onSearch={handleHistorySearch}
-              />
+              {history.length === 0 && historyTotal === 0 ? (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-8 w-64" />
+                  </div>
+                  <div className="space-y-3">
+                    <Skeleton className="h-24" />
+                    <Skeleton className="h-24" />
+                    <Skeleton className="h-24" />
+                  </div>
+                </div>
+              ) : (
+                <EventHistory
+                  history={history}
+                  page={historyPage}
+                  pages={historyPages}
+                  total={historyTotal}
+                  perPage={historyPerPage}
+                  search={historySearch}
+                  onPageChange={(p) => setHistoryPage(p)}
+                  onSearch={handleHistorySearch}
+                />
+              )}
             </div>
             <div className="md:col-span-1">
-              <CommunityBoard messages={messages} />
+              {messages.length === 0 ? (
+                <div className="glass-effect rounded-xl p-4 md:p-6 w-full">
+                  <div className="flex items-center justify-between mb-4">
+                    <Skeleton className="h-6 w-40" />
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </div>
+                  <div className="space-y-4">
+                    <Skeleton className="h-24" />
+                    <Skeleton className="h-24" />
+                    <Skeleton className="h-24" />
+                  </div>
+                </div>
+              ) : (
+                <CommunityBoard messages={messages} />
+              )}
             </div>
           </div>
         </div>
