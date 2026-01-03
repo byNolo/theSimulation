@@ -38,7 +38,7 @@ const CommunityBoard: React.FC<Props> = ({ messages }) => {
     const currentDayId = messages.length > 0 ? Math.max(...messages.map(m => m.day_id)) : 0
 
     return (
-        <div className="glass-effect rounded-xl p-6 w-full">
+        <div className="glass-effect rounded-xl p-4 md:p-6 w-full">
             <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -51,7 +51,7 @@ const CommunityBoard: React.FC<Props> = ({ messages }) => {
                 </span>
             </div>
 
-            <div className="space-y-4 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-4 md:max-h-[800px] md:overflow-y-auto pr-2 custom-scrollbar">
                 {messages.map((msg) => (
                     <div key={msg.id} className="space-y-2">
                         {/* Main Message */}
@@ -74,7 +74,7 @@ const CommunityBoard: React.FC<Props> = ({ messages }) => {
                                             {msg.day_id === currentDayId ? 'Today' : `Day ${msg.day_id}`}
                                         </span>
                                     </div>
-                                    <p className="text-sm text-gray-300 mt-1 leading-relaxed">
+                                    <p className="text-sm text-gray-300 mt-1 leading-relaxed break-words">
                                         {msg.content}
                                     </p>
                                 </div>

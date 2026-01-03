@@ -28,7 +28,7 @@ export default function FeatureAnnouncementModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-gray-900 border border-sky-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative overflow-hidden">
+      <div className="bg-gray-900 border border-sky-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[85vh] overflow-y-auto custom-scrollbar">
         {/* Background decoration */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
         

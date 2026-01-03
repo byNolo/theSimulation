@@ -23,6 +23,7 @@ A multiplayer social experiment where collective choices shape a persistent worl
 - **OAuth Authentication**: Secure login via KeyN.
 - **Admin Dashboard**: Event management, metrics, history tracking, and telemetry.
 - **Responsive Design**: Modern glass-morphism UI with dynamic backgrounds.
+  - **Mobile-First Experience**: Dedicated tabbed interface for mobile users for streamlined navigation.
 - **Real-time Updates**: Live vote tallies and stat changes.
 
 ## Tech Stack

@@ -25,7 +25,7 @@ const EventCard: React.FC<{
   const totalVotes = Object.values(tally).reduce((sum, val) => sum + val, 0)
   
   return (
-    <section className="glass-effect rounded-2xl p-8 space-y-6 relative overflow-hidden">
+    <section className="glass-effect rounded-2xl p-6 md:p-8 space-y-6 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-full blur-3xl -z-10" />
       
@@ -39,7 +39,7 @@ const EventCard: React.FC<{
 
       {/* Headline */}
       <div className="space-y-3">
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent leading-tight">
+        <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent leading-tight">
           {event.headline}
         </h2>
         <p className="text-gray-300 text-lg leading-relaxed">{event.description}</p>

@@ -7,7 +7,7 @@ from ..models_projects import Project, ActiveProject, CompletedProject, ProjectV
 from ..events import choose_template, find_template_by_options, EventTemplate, Option
 from ..ai_generator import generate_daily_event, generate_day_summary
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 import logging
 
 logger = logging.getLogger(__name__)
@@ -458,11 +458,8 @@ def get_current():
 
 
 def tally_for_day(day_id: int):
-    votes = Vote.query.filter_by(day_id=day_id).all()
-    t = {}
-    for v in votes:
-        t[v.option] = t.get(v.option, 0) + 1
-    return t
+    results = db.session.query(Vote.option, func.count(Vote.option)).filter_by(day_id=day_id).group_by(Vote.option).all()
+    return {option: count for option, count in results}
 
 
 @api_bp.route('/state')

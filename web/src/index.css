@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+  html, body {
+    overflow-x: hidden;
+  }
+  
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     @apply bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950;
@@ -29,6 +33,7 @@
   .shimmer {
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
     animation: shimmer 2s infinite;
+    will-change: transform;
   }
   
   @keyframes shimmer {
@@ -42,6 +47,10 @@
   
   .glow-green {
     box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
   }
   
   .glow-amber {

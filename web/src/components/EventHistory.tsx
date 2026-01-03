@@ -48,19 +48,19 @@ const EventHistory: React.FC<{
   // we'll show a friendly message in the list area below instead
 
   return (
-    <section className="glass-effect rounded-2xl p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <section className="glass-effect rounded-2xl p-6 md:p-8 space-y-6">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
           Event History
         </h2>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
           <div className="flex items-center gap-2 text-sm text-gray-400">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span>{total} past {total === 1 ? 'event' : 'events'}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <input
               type="text"
               placeholder="Search history..."
@@ -69,7 +69,7 @@ const EventHistory: React.FC<{
               onKeyDown={e => {
                 if (e.key === 'Enter' && onSearch) onSearch(localSearch.trim())
               }}
-              className="px-3 py-2 glass-effect-dark rounded-lg text-sm w-48"
+              className="px-3 py-2 glass-effect-dark rounded-lg text-sm flex-1 sm:w-48 sm:flex-none"
             />
             <button
               onClick={() => onSearch && onSearch(localSearch.trim())}
@@ -97,32 +97,32 @@ const EventHistory: React.FC<{
               {/* Header - always visible */}
               <button
                 onClick={() => setExpandedDay(isExpanded ? null : entry.day)}
-                className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+                className="w-full p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-white/5 transition-colors"
               >
-                <div className="flex items-center gap-4">
-                  <div className="flex flex-col items-center justify-center w-16 h-16 glass-effect rounded-lg">
+                <div className="flex items-center gap-4 w-full sm:w-auto">
+                  <div className="flex flex-col items-center justify-center w-16 h-16 glass-effect rounded-lg shrink-0">
                     <span className="text-xs text-gray-400">Day</span>
                     <span className="text-xl font-bold">{entry.day}</span>
                   </div>
-                  <div className="text-left">
-                    <h3 className="font-semibold text-lg">{entry.headline}</h3>
+                  <div className="text-left min-w-0 flex-1">
+                    <h3 className="font-semibold text-lg break-words">{entry.headline}</h3>
                     <p className="text-sm text-gray-400">{new Date(entry.date).toLocaleDateString()}</p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
                   {/* Chosen option badge */}
-                  <div className="flex items-center gap-2 glass-effect px-4 py-2 rounded-lg">
-                    <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex items-center gap-2 glass-effect px-3 py-2 rounded-lg min-w-0 flex-1 sm:flex-none justify-center">
+                    <svg className="w-4 h-4 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <span className="text-sm capitalize">{entry.chosen_option_label}</span>
-                    <span className="text-xs text-gray-400">({chosenPercentage}%)</span>
+                    <span className="text-sm capitalize truncate">{entry.chosen_option_label}</span>
+                    <span className="text-xs text-gray-400 shrink-0">({chosenPercentage}%)</span>
                   </div>
                   
                   {/* Expand/collapse icon */}
                   <svg 
-                    className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                    className={`w-5 h-5 text-gray-400 transition-transform shrink-0 ${isExpanded ? 'rotate-180' : ''}`} 
                     fill="none" 
                     viewBox="0 0 24 24" 
                     stroke="currentColor"

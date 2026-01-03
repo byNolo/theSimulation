@@ -67,7 +67,7 @@ const BaseDashboard: React.FC<BaseDashboardProps> = ({
 
     return (
         <div className="space-y-8">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                         <span className="text-blue-400">🏗️</span> Base Command
@@ -263,7 +263,7 @@ const BaseDashboard: React.FC<BaseDashboardProps> = ({
                     {completedProjects.map(p => (
                         <div key={p.id} className="glass-effect p-4 rounded-lg border border-green-500/20 flex flex-col items-center text-center">
                             <div className="text-3xl mb-2">{getIcon(p.icon)}</div>
-                            <div className="font-bold text-green-100 text-sm">{p.name}</div>
+                            <div className="font-bold text-green-100 text-sm break-words w-full">{p.name}</div>
                             <div className="text-xs text-green-400/70 mt-1">Online</div>
                         </div>
                     ))}
@@ -278,11 +278,11 @@ const BaseDashboard: React.FC<BaseDashboardProps> = ({
                         <div key={p.id} className="glass-effect p-5 rounded-xl border border-white/5 hover:border-white/10 transition-colors group">
                             <div className="flex justify-between items-start mb-3">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-2xl">
+                                    <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-2xl shrink-0">
                                         {getIcon(p.icon)}
                                     </div>
-                                    <div>
-                                        <div className="font-bold text-white group-hover:text-blue-300 transition-colors">{p.name}</div>
+                                    <div className="min-w-0">
+                                        <div className="font-bold text-white group-hover:text-blue-300 transition-colors break-words">{p.name}</div>
                                         <div className="text-xs text-gray-400 flex items-center gap-1">
                                             <span>Cost:</span>
                                             <span className="text-blue-300 font-mono">{p.cost} Units</span>
